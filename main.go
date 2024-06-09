@@ -11,10 +11,10 @@ import (
 )
 
 // Number of Servers + Number of Coded chunks
-var n = 1000
+var n = 150
 
 // Number of Data chunks
-var k = 660
+var k = 100
 
 type Chunk struct {
 	Data  []byte

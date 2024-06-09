@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/sha256"
-	"fmt"
 	"math/rand"
 	"os"
 	"time"
@@ -31,7 +30,7 @@ func SimulateBandwidthLimit(chunkSize int) {
 
 	bandwidth := 10 * 1_000_000 / 8
 	delay := time.Duration(chunkSize) * time.Second / time.Duration(bandwidth)
-	fmt.Println("Simulating bandwidth limit:", delay)
+	// fmt.Println("Simulating bandwidth limit:", delay)
 	time.Sleep(delay)
 }
 

@@ -64,15 +64,25 @@ func (node *Node) downloadBlockHeader(blockID int) (string, error) {
 	return "", fmt.Errorf("block header not found")
 }
 
-func (node *Node) downloadChunk(blockID int) (CodedChunk, error) {
-	fmt.Println("Downloading chunk ", blockID)
-	node.simulateNetworkConditions(chunkSize + proofSize)
+func (node *Node) downloadChunk(blockID int, fromNode *Node) (CodedChunk, error) {
+	dataSize := chunkSize + proofSize
+	node.simulateNetworkConditions(dataSize)
 
-	for _, peer := range node.Peers {
-		peer.Mutex.Lock()
-		chunk := peer.Chunk
-		peer.Mutex.Unlock()
-		return chunk, nil
+	fromNode.Mutex.Lock()
+	_, exists := fromNode.Blocks[blockID]
+	fromNode.Mutex.Unlock()
+
+	if exists {
+		fromNode.simulateNetworkConditions(dataSize)
+		return CodedChunk{}, nil
+	} else {
+		fromNode.Mutex.Lock()
+		fromNode.Blocks[blockID] = Block{
+			Header: fmt.Sprintf("Header %d", blockID),
+			Data:   fmt.Sprintf("Data %d", blockID),
+			Size:   blockHSize + blockBSize,
+		}
+		fromNode.Mutex.Unlock()
 	}
 
 	return CodedChunk{}, fmt.Errorf("chunk not found")
@@ -96,7 +106,7 @@ func (node *Node) verifyBlock() bool {
 	return true
 }
 
-func simulateBlockRecovery(node *Node, missingBlocks []int) {
+func simulateBlockRecovery(node *Node, missingBlocks []int, numNodes int) {
 	if 3*node.F+1 > len(node.Peers) {
 		fmt.Printf("Not enough nodes to tolerate %d faulty nodes\n", node.F)
 		return
@@ -104,16 +114,17 @@ func simulateBlockRecovery(node *Node, missingBlocks []int) {
 
 	start := time.Now()
 
-	for _, blockID := range missingBlocks {
+	for i, blockID := range missingBlocks {
 		// Step 1: Download block header
-		header, err := node.downloadBlockHeader(blockID)
+		_, err := node.downloadBlockHeader(blockID)
 		if err != nil {
 			fmt.Printf("Failed to download block header: %v\n", err)
 			return
 		}
-
+		// peerIndex := rand.Intn(len(node.Peers)) // Randomly select a peer to download from
+		peerIndex := i % (numNodes - 1) // Round-robin selection of peers
 		// Step 2: Download the full block
-		codedChunk, err := node.downloadChunk(blockID)
+		codedChunk, err := node.downloadChunk(blockID, node.Peers[peerIndex])
 		if err != nil {
 			fmt.Printf("Failed to download block: %v\n", err)
 			return
@@ -135,7 +146,7 @@ func simulateBlockRecovery(node *Node, missingBlocks []int) {
 			node.Mutex.Lock()
 			node.Chunk = codedChunk
 			node.Mutex.Unlock()
-			fmt.Printf("Recovered and verified Chunk %d: header = %s, data = %s\n", blockID, header, codedChunk.Data)
+			// fmt.Printf("Recovered and verified Chunk %d: header = %s, data = %s\n", blockID, header, codedChunk.Data)
 		} else {
 			fmt.Printf("Failed to verify block %d from 2f+1 nodes\n", blockID)
 		}
@@ -196,19 +207,32 @@ func connectNodes(nodes []*Node) {
 func missingBlocks(n int) []int {
 	blocks := make([]int, n)
 	for i := 0; i < n; i++ {
-		blocks[i] = rand.Intn(n) + 1
+		blocks[i] = rand.Intn(99) + 1
 	}
 	return blocks
 }
 
 func main() {
+	nodeCounts := []int{10, 50, 100}
+	fValues := []int{1, 2, 3}
+	missingBlockCounts := []int{10, 30, 50}
+
+	for _, numNodes := range nodeCounts {
+		for _, f := range fValues {
+			for _, numMissingBlocks := range missingBlockCounts {
+				experiment(numNodes, f, numMissingBlocks)
+			}
+		}
+	}
+}
+
+func experiment(numNodes, f, numMissingBlocks int) {
+	fmt.Printf("Running experiment with %d nodes, f = %d, %d missing blocks\n", numNodes, f, numMissingBlocks)
 	network := initializeNetwork(50*time.Millisecond, 10) // 50 ms network delay, 10 Mbps bandwidth
-	numNodes := 100
-	f := 1
 
 	nodes := initializeNodes(numNodes, f, network)
 	populateBlocks(nodes, 100)
 	connectNodes(nodes)
 
-	simulateBlockRecovery(nodes[0], missingBlocks(30))
+	simulateBlockRecovery(nodes[0], missingBlocks(numMissingBlocks), numNodes)
 }

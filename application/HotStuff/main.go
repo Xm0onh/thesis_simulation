@@ -14,12 +14,13 @@ type Block struct {
 }
 
 type Node struct {
-	ID      int
-	Blocks  map[int]Block
-	Mutex   sync.Mutex
-	Peers   []*Node
-	Network *Network
-	F       int
+	ID            int
+	Blocks        map[int]Block
+	Mutex         sync.Mutex
+	Peers         []*Node
+	Network       *Network
+	F             int
+	BandwidthUsed int // Track bandwidth usage
 }
 
 // Network simulates network conditions
@@ -28,8 +29,6 @@ type Network struct {
 	Bandwidth int // in Mbps
 }
 
-// Constants representing block header and body sizes in bytes
-// block header and block body size is based on Bitcoin blocks
 const (
 	blockHSize = 80              // Block header size in bytes
 	blockBSize = 1 * 1024 * 1024 // Block body size in bytes (1 MB)
@@ -51,23 +50,24 @@ func (node *Node) downloadBlockHeader(blockID int) (string, error) {
 	return "", fmt.Errorf("block header not found")
 }
 
-func (node *Node) downloadBlock(blockID int) (Block, error) {
-	node.simulateNetworkConditions(blockHSize + blockBSize)
+func (node *Node) downloadBlock(blockID int, fromNode *Node) (Block, error) {
+	dataSize := blockHSize + blockBSize
+	node.simulateNetworkConditions(dataSize)
 
-	for _, peer := range node.Peers {
-		peer.Mutex.Lock()
-		block, exists := peer.Blocks[blockID]
-		peer.Mutex.Unlock()
+	fromNode.Mutex.Lock()
+	block, exists := fromNode.Blocks[blockID]
+	fromNode.Mutex.Unlock()
 
-		if exists {
-			return block, nil
-		}
+	if exists {
+		// Simulate bandwidth usage
+		fromNode.simulateNetworkConditions(dataSize)
+		fromNode.BandwidthUsed += dataSize
+		return block, nil
 	}
 
 	return Block{}, fmt.Errorf("block not found")
 }
 
-// simulateNetworkConditions simulates network delay and bandwidth constraints
 func (node *Node) simulateNetworkConditions(dataSizeBytes int) {
 	time.Sleep(node.Network.Delay)
 
@@ -78,15 +78,13 @@ func (node *Node) simulateNetworkConditions(dataSizeBytes int) {
 	time.Sleep(transferTime)
 }
 
-// verifyBlock simulates the time taken to verify a block
 func (node *Node) verifyBlock() bool {
 	verifyTime := time.Duration(rand.Intn(100)+50) * time.Millisecond // Random verification time between 50-150 ms
 	time.Sleep(verifyTime)
 	return true
 }
 
-func simulateBlockRecovery(node *Node, missingBlocks []int) {
-
+func simulateBlockRecovery(node *Node, missingBlocks []int, numNodes int) {
 	if 3*node.F+1 > len(node.Peers) {
 		fmt.Printf("Not enough nodes to tolerate %d faulty nodes\n", node.F)
 		return
@@ -94,21 +92,21 @@ func simulateBlockRecovery(node *Node, missingBlocks []int) {
 
 	start := time.Now()
 
-	for _, blockID := range missingBlocks {
+	for i, blockID := range missingBlocks {
 		// Step 1: Download block header
-		header, err := node.downloadBlockHeader(blockID)
+		_, err := node.downloadBlockHeader(blockID)
 		if err != nil {
 			fmt.Printf("Failed to download block header: %v\n", err)
 			return
 		}
 
 		// Step 2: Download the full block
-		block, err := node.downloadBlock(blockID)
+		peerIndex := i % (numNodes - 1) // Round-robin selection of peers
+		block, err := node.downloadBlock(blockID, node.Peers[peerIndex])
 		if err != nil {
 			fmt.Printf("Failed to download block: %v\n", err)
 			return
 		}
-		fmt.Println("Successfuly downloaded block from peer with id: ", blockID)
 
 		// Step 3: Verify the block from at least 2f+1 nodes
 		verificationCount := 0
@@ -126,7 +124,6 @@ func simulateBlockRecovery(node *Node, missingBlocks []int) {
 			node.Mutex.Lock()
 			node.Blocks[blockID] = block
 			node.Mutex.Unlock()
-			fmt.Printf("Recovered and verified block %d: header = %s, data = %s\n", blockID, header, block.Data)
 		} else {
 			fmt.Printf("Failed to verify block %d from 2f+1 nodes\n", blockID)
 		}
@@ -147,14 +144,16 @@ func initializeNodes(numNodes, f int, network *Network) []*Node {
 	nodes := make([]*Node, numNodes)
 	for i := 0; i < numNodes; i++ {
 		nodes[i] = &Node{
-			ID:      i,
-			Blocks:  make(map[int]Block),
-			Network: network,
-			F:       f,
+			ID:            i,
+			Blocks:        make(map[int]Block),
+			Network:       network,
+			F:             f,
+			BandwidthUsed: 0,
 		}
 	}
 	return nodes
 }
+
 func populateBlocks(nodes []*Node, numBlocks int) {
 	for i := 0; i < len(nodes); i++ {
 		for j := 0; j < numBlocks; j++ {
@@ -181,19 +180,32 @@ func connectNodes(nodes []*Node) {
 func missingBlocks(n int) []int {
 	blocks := make([]int, n)
 	for i := 0; i < n; i++ {
-		blocks[i] = rand.Intn(n) + 1
+		blocks[i] = rand.Intn(99) + 1
 	}
 	return blocks
 }
 
 func main() {
+	nodeCounts := []int{10, 50, 100}
+	fValues := []int{1, 2, 3}
+	missingBlockCounts := []int{10, 30, 50}
+
+	for _, numNodes := range nodeCounts {
+		for _, f := range fValues {
+			for _, numMissingBlocks := range missingBlockCounts {
+				experiment(numNodes, f, numMissingBlocks)
+			}
+		}
+	}
+}
+
+func experiment(numNodes, f, numMissingBlocks int) {
+	fmt.Printf("Running experiment with %d nodes, f = %d, %d missing blocks\n", numNodes, f, numMissingBlocks)
 	network := initializeNetwork(50*time.Millisecond, 10) // 50 ms network delay, 10 Mbps bandwidth
-	numNodes := 100
-	f := 1 // Number of tolerated faulty nodes
 
 	nodes := initializeNodes(numNodes, f, network)
 	populateBlocks(nodes, 100)
 	connectNodes(nodes)
 
-	simulateBlockRecovery(nodes[0], missingBlocks(30))
+	simulateBlockRecovery(nodes[0], missingBlocks(numMissingBlocks), numNodes)
 }

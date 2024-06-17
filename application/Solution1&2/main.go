@@ -38,8 +38,9 @@ type Network struct {
 // Constants representing block header and body sizes in bytes
 const (
 	blockHSize               = 508 // Block header size in bytes
-	CommitmentSize           = 1024
+	CommitmentSize           = 24
 	blockHSizeWithCommitment = blockHSize + CommitmentSize
+	proofSize                = 64
 	blockBSize               = 1000 * 1024 // Block body size in bytes (1000 KB)
 	numberOfChunks           = 10
 	chunkSize                = blockBSize / numberOfChunks
@@ -64,7 +65,7 @@ func (node *Node) downloadBlockHeader(blockID int) (string, error) {
 
 func (node *Node) downloadChunk(blockID int) (CodedChunk, error) {
 	fmt.Println("Downloading chunk ", blockID)
-	node.simulateNetworkConditions(chunkSize)
+	node.simulateNetworkConditions(chunkSize + proofSize)
 
 	for _, peer := range node.Peers {
 		peer.Mutex.Lock()

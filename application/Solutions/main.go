@@ -193,14 +193,22 @@ func connectNodes(nodes []*Node) {
 	}
 }
 
+func missingBlocks(n int) []int {
+	blocks := make([]int, n)
+	for i := 0; i < n; i++ {
+		blocks[i] = rand.Intn(n) + 1
+	}
+	return blocks
+}
+
 func main() {
 	network := initializeNetwork(50*time.Millisecond, 10) // 50 ms network delay, 10 Mbps bandwidth
-	numNodes := 10
+	numNodes := 100
 	f := 1
 
 	nodes := initializeNodes(numNodes, f, network)
-	populateBlocks(nodes, 5)
+	populateBlocks(nodes, 100)
 	connectNodes(nodes)
 
-	simulateBlockRecovery(nodes[0], []int{1, 2, 3})
+	simulateBlockRecovery(nodes[0], missingBlocks(30))
 }

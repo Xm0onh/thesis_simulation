@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	github.com/cloud9-tools/go-galoisfield v0.0.0-20160311182916-a8cf2bffadf0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
 	github.com/stretchr/testify v1.8.2 // indirect

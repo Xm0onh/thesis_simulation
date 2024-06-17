@@ -36,12 +36,13 @@ type Network struct {
 }
 
 // Constants representing block header and body sizes in bytes
+// block header and block body size is based on Bitcoin blocks
 const (
-	blockHSize               = 508 // Block header size in bytes
+	blockHSize               = 80 // Block header size in bytes
 	CommitmentSize           = 24
 	blockHSizeWithCommitment = blockHSize + CommitmentSize
 	proofSize                = 64
-	blockBSize               = 1000 * 1024 // Block body size in bytes (1000 KB)
+	blockBSize               = 1 * 1024 * 1024 // Block body size in bytes (1 MB)
 	numberOfChunks           = 10
 	chunkSize                = blockBSize / numberOfChunks
 )

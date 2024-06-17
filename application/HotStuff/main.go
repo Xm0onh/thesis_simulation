@@ -29,9 +29,10 @@ type Network struct {
 }
 
 // Constants representing block header and body sizes in bytes
+// block header and block body size is based on Bitcoin blocks
 const (
-	blockHSize = 508         // Block header size in bytes
-	blockBSize = 1000 * 1024 // Block body size in bytes (1000 KB)
+	blockHSize = 80              // Block header size in bytes
+	blockBSize = 1 * 1024 * 1024 // Block body size in bytes (1 MB)
 )
 
 func (node *Node) downloadBlockHeader(blockID int) (string, error) {

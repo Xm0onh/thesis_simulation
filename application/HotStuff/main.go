@@ -125,13 +125,13 @@ func simulateBlockRecovery(node *Node, missingBlocks []int, numNodes int, numMis
 			for _, peer := range node.Peers {
 				if peer.verifyBlock() {
 					verificationCount++
-					if verificationCount == numMissingBlocks {
+					if verificationCount > node.F+1 {
 						break
 					}
 				}
 			}
 
-			if verificationCount >= 2*node.F+1 {
+			if verificationCount >= node.F+1 {
 				// Store the recovered block
 				node.Mutex.Lock()
 				node.Blocks[blockID] = block
@@ -200,7 +200,8 @@ func missingBlocks(n int) []int {
 	return blocks
 }
 func main() {
-	nodeCounts := []int{10, 25, 35, 50, 60, 80, 100}
+	// nodeCounts := []int{10, 25, 35, 50, 60, 80, 100}
+	nodeCounts := []int{100}
 
 	for _, numNodes := range nodeCounts {
 		var fValues []int
@@ -212,7 +213,7 @@ func main() {
 		case numNodes <= 50:
 			fValues = []int{0, 1, 5, 10, 15}
 		case numNodes <= 100:
-			fValues = []int{0, 1, 10, 20, 30}
+			fValues = []int{0, 10, 20, 30}
 		}
 
 		for _, f := range fValues {
@@ -220,7 +221,7 @@ func main() {
 				continue
 			}
 
-			for numMissingBlocks := 5; numMissingBlocks < numNodes; numMissingBlocks += 5 {
+			for numMissingBlocks := 5; numMissingBlocks < numNodes; numMissingBlocks += 20 {
 				experiment(numNodes, f, numMissingBlocks)
 			}
 		}

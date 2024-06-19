@@ -22,7 +22,7 @@ type Block struct {
 type Node struct {
 	ID            int
 	Blocks        map[int]Block
-	Chunk         CodedChunk
+	Chunks        map[int]CodedChunk
 	Mutex         sync.Mutex
 	Peers         []*Node
 	Network       *Network
@@ -65,7 +65,7 @@ func (node *Node) downloadBlockHeader(blockID int) (string, error) {
 	return "", fmt.Errorf("block header not found")
 }
 
-func (node *Node) downloadChunk(blockID int, fromNode *Node) (CodedChunk, error) {
+func (node *Node) downloadChunk(blockID, chunkID int, fromNode *Node) (CodedChunk, error) {
 	dataSize := chunkSize + proofSize
 
 	// Simulate the upload time from the peer node
@@ -78,9 +78,9 @@ func (node *Node) downloadChunk(blockID int, fromNode *Node) (CodedChunk, error)
 
 	if exists {
 		return CodedChunk{
-			ChunkID:   blockID,
-			OrgChunks: []int{blockID},
-			Data:      fmt.Sprintf("Chunk data %d", blockID),
+			ChunkID:   chunkID,
+			OrgChunks: []int{chunkID},
+			Data:      fmt.Sprintf("Chunk data %d from block %d", chunkID, blockID),
 		}, nil
 	}
 
@@ -114,55 +114,63 @@ func simulateBlockRecovery(node *Node, missingBlocks []int, numNodes int, numMis
 	start := time.Now()
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, laggingNodeBandwidth)
+	totalChunks := 0
 
-	for i, blockID := range missingBlocks {
-		sem <- struct{}{}
-		wg.Add(1)
-		peerIndex := i % (numNodes - 1)
+	for _, blockID := range missingBlocks {
+		for chunkID := 0; chunkID < numberOfChunks; chunkID++ {
+			sem <- struct{}{}
+			wg.Add(1)
+			peerIndex := (blockID + chunkID) % (numNodes - 1)
 
-		go func(blockID int) {
-			defer wg.Done()
-			defer func() { <-sem }() // Release the slot
+			go func(blockID, chunkID int) {
+				defer wg.Done()
+				defer func() { <-sem }() // Release the slot
 
-			// Step 1: Download block header
-			_, err := node.downloadBlockHeader(blockID)
-			if err != nil {
-				fmt.Printf("Failed to download block header: %v\n", err)
-				return
-			}
+				// Step 1: Download block header
+				_, err := node.downloadBlockHeader(blockID)
+				if err != nil {
+					fmt.Printf("Failed to download block header: %v\n", err)
+					return
+				}
 
-			// Step 2: Download the full block from a random peer
-			codedChunk, err := node.downloadChunk(blockID, node.Peers[peerIndex])
-			if err != nil {
-				fmt.Printf("Failed to download block: %v\n", err)
-				return
-			}
+				// Step 2: Download the chunk from a peer
+				codedChunk, err := node.downloadChunk(blockID, chunkID, node.Peers[peerIndex])
+				if err != nil {
+					fmt.Printf("Failed to download chunk: %v\n", err)
+					return
+				}
 
-			// Step 3: Verify the block from at least 2f+1 nodes
-			verificationCount := 0
-			for _, peer := range node.Peers {
-				if peer.verifyBlock() {
-					verificationCount++
-					if verificationCount == numMissingBlocks {
-						break
+				// Step 3: Verify the chunk from at least 2f+1 nodes
+				verificationCount := 0
+				for _, peer := range node.Peers {
+					if peer.verifyBlock() {
+						verificationCount++
+						if verificationCount > node.F+1 {
+							break
+						}
 					}
 				}
-			}
 
-			if verificationCount >= 2*node.F+1 {
-				// Store the recovered block
+				if verificationCount >= node.F+1 {
+					// Store the recovered chunk
+					node.Mutex.Lock()
+					node.Chunks[chunkID] = codedChunk
+					node.Mutex.Unlock()
+					// fmt.Printf("Recovered and verified Chunk %d: header = %s, data = %s\n", blockID, header, codedChunk.Data)
+				}
+
 				node.Mutex.Lock()
-				node.Chunk = codedChunk
+				totalChunks++
 				node.Mutex.Unlock()
-				// fmt.Printf("Recovered and verified Chunk %d: header = %s, data = %s\n", blockID, header, codedChunk.Data)
-			}
-		}(blockID)
+			}(blockID, chunkID)
+		}
 	}
 
 	wg.Wait()
 
 	duration := time.Since(start)
 	fmt.Printf("Recovered %d blocks in %v\n", len(missingBlocks), duration)
+	fmt.Printf("Recovered %d chunks for %d blocks in %v\n", totalChunks, len(missingBlocks), duration)
 }
 
 func initializeNetwork(delay time.Duration, bandwidth int) *Network {
@@ -178,6 +186,7 @@ func initializeNodes(numNodes, f int, network *Network) []*Node {
 		nodes[i] = &Node{
 			ID:            i,
 			Blocks:        make(map[int]Block),
+			Chunks:        make(map[int]CodedChunk),
 			Network:       network,
 			F:             f,
 			BandwidthUsed: 0,
@@ -195,10 +204,12 @@ func populateBlocks(nodes []*Node, numBlocks int) {
 				Data:   fmt.Sprintf("Data %d", blockID),
 				Size:   blockHSize + blockBSize,
 			}
-			nodes[i].Chunk = CodedChunk{
-				ChunkID:   blockID,
-				OrgChunks: []int{blockID},
-				Data:      fmt.Sprintf("Chunk data %d", blockID),
+			for k := 0; k < numberOfChunks; k++ {
+				nodes[i].Chunks[k] = CodedChunk{
+					ChunkID:   k,
+					OrgChunks: []int{k},
+					Data:      fmt.Sprintf("Chunk data %d", k),
+				}
 			}
 		}
 	}
@@ -221,20 +232,14 @@ func missingBlocks(n int) []int {
 	}
 	return blocks
 }
-func main() {
-	nodeCounts := []int{10, 25, 35, 50, 60, 80, 100}
 
+func main() {
+	nodeCounts := []int{100}
 	for _, numNodes := range nodeCounts {
 		var fValues []int
 		switch {
-		case numNodes <= 10:
-			fValues = []int{0, 1, 2}
-		case numNodes <= 25:
-			fValues = []int{0, 1, 5, 7}
-		case numNodes <= 50:
-			fValues = []int{0, 1, 5, 10, 15}
 		case numNodes <= 100:
-			fValues = []int{0, 1, 10, 20, 30}
+			fValues = []int{0, 10, 20, 30}
 		}
 
 		for _, f := range fValues {
@@ -242,7 +247,7 @@ func main() {
 				continue
 			}
 
-			for numMissingBlocks := 5; numMissingBlocks < numNodes; numMissingBlocks += 5 {
+			for numMissingBlocks := 5; numMissingBlocks < numNodes; numMissingBlocks += 20 {
 				experiment(numNodes, f, numMissingBlocks)
 			}
 		}

@@ -82,10 +82,11 @@ func (n *Node) sendChunkRequest(blockID int) {
 func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 	block := n.generateBlockForRequest(request.BlockID)
 	blockBytes, _ := json.Marshal(block)
+	fmt.Println("Size of block in bytes: ", len(blockBytes))
 	chunks := GenerateCodedChunks(blockBytes)
 	rootHash, proofs := CreateVectorCommitment(chunks)
-	for i, chunk := range chunks {
-		chunk.Proof = *proofs[i]
+	for i := range chunks {
+		chunks[i].Proof = *proofs[i]
 	}
 
 	response := ChunkResponse{
@@ -137,9 +138,8 @@ func (n *Node) generateBlockForRequest(blockID int) *Block {
 func (n *Node) handleChunkResponse(response *ChunkResponse) {
 
 	n.Metrics.TotalChunks++
-	startTime := time.Now()
-	if VerifyChunk(response.Commitment, *response.Chunk, &response.Chunk.Proof) {
-		n.Metrics.VerificationTime += time.Since(startTime)
+	// fmt.Println("response commtiment: ", response.Commitment, "proof", response.Chunk.Proof)
+	if VerifyChunk(response.Commitment, *response.Chunk, &response.Chunk.Proof, n) {
 		n.Metrics.SuccessfulChunks++
 		n.ReceivedChunks[response.NodeID] = *response.Chunk
 		fmt.Println("Chunk integrated successfully.")
@@ -154,5 +154,6 @@ func (n *Node) handleChunkResponse(response *ChunkResponse) {
 			log.Fatalf("Error decoding message: %v", err)
 		}
 		fmt.Println("Decoded message:", len(decodedMessage))
+		// size of message in byte
 	}
 }

@@ -108,7 +108,7 @@ func (n *Node) readResponse(conn net.Conn) {
 			break
 		}
 
-		fmt.Printf("Node %d read %d bytes\n", n.ID, length)
+		// fmt.Printf("Node %d read %d bytes\n", n.ID, length)
 		accumulatedData.Write(buf[:length])
 
 		// Check if we have a full JSON object

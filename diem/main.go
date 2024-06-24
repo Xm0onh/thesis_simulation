@@ -7,7 +7,7 @@ import (
 
 const (
 	TXN_SIZE   = 10000
-	CHUNK_SIZE = 100
+	CHUNK_SIZE = 1000
 )
 
 type Transaction struct {

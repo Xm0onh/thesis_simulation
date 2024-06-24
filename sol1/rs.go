@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/klauspost/reedsolomon"
+	"github.com/tendermint/tendermint/crypto/merkle"
 )
 
 // GenerateCodedChunks generates n coded chunks from the original data
@@ -29,7 +30,7 @@ func GenerateCodedChunks(data []byte) []Chunk {
 	// Convert shards to chunks
 	chunks := make([]Chunk, N)
 	for i := 0; i < N; i++ {
-		chunks[i] = Chunk{Data: shards[i]}
+		chunks[i] = Chunk{Data: shards[i], Proof: merkle.Proof{}}
 	}
 
 	return chunks

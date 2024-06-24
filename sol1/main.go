@@ -9,7 +9,7 @@ import (
 
 const (
 	TXN_SIZE = 10000
-	N        = 15
+	N        = 20
 	K        = 10
 )
 

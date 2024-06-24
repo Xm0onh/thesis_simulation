@@ -31,6 +31,8 @@ type Node struct {
 	Peers         map[int]string // Map of peer nodes for direct referencing and messaging
 	BlockHeight   int            // Current height of the blockchain this node maintains
 	ConsensusRole string         // Role of the node in the consensus process, e.g., proposer, validator
+	Metrics       *SyncMetrics   // Metrics for tracking synchronization performance
+
 }
 
 type Network struct {
@@ -57,7 +59,7 @@ type ChunkResponse struct {
 	NodeID       int           // ID of the responding node
 	BlockID      int           // Identifier of the block from which the chunk is derived
 	Transactions []Transaction // The transactions that are included in the chunk
-	Proof        []byte        // Cryptographic proof validating the transactions
+	Proof        []string      // Cryptographic proof validating the transactions
 	Success      bool          // Indicates if the response is successfully processed or not
 	ErrorMessage string        // In case of an error, contains the error message
 }
@@ -71,6 +73,14 @@ type SyncMetrics struct {
 	SuccessfulChunks  int           // Number of successfully verified chunks
 	FailedChunks      int           // Number of chunks that failed verification
 	TotalDuration     time.Duration // Total time taken for the synchronization process
+}
+
+type TransactionAccumulatorRangeProof struct {
+	LeftSiblings []string // Left siblings in the Merkle tree
+}
+
+type TransactionInfo struct {
+	TransactionHash string // Hash of the transaction
 }
 
 func main() {

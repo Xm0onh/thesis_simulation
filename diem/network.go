@@ -119,7 +119,7 @@ func (n *Node) readResponse(conn net.Conn) {
 			}
 			// fmt.Printf("Node %d received message: %v\n", n.ID, message)
 
-			if message.Type == "response" {
+			if message.Type == "response" || message.Type == "last_response" {
 				var response ChunkResponse
 				contentBytes, err := json.Marshal(message.Content)
 				if err != nil {
@@ -131,7 +131,9 @@ func (n *Node) readResponse(conn net.Conn) {
 					continue
 				}
 				n.handleChunkResponse(&response)
-
+				if message.Type == "last_response" {
+					break
+				}
 			}
 		}
 	}

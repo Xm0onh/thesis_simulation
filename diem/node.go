@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -21,64 +23,13 @@ func (n *Node) Start() {
 	}()
 }
 
-func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
-	block := n.generateBlockForRequest(request.BlockID)
-	txs := block.Transactions
-	fmt.Println("num of txs: ", len(txs))
-	for i := 0; i < len(block.Transactions); i += request.RequestSize {
-		// TODO
-		// Implement proof generation for chunk of transactions
-
-		// Serialize and send the response
-		response := ChunkResponse{
-			NodeID:       n.ID,
-			BlockID:      block.ID,
-			Transactions: txs[i:min(i+request.RequestSize, len(txs))],
-			Proof:        []byte{}, // TODO: Implement proof generation
-			Success:      true,
-		}
-
-		var message = &Message{
-			From:    n.ID,
-			To:      request.NodeID,
-			Type:    "response",
-			Content: response,
-		}
-
-		responseBytes, err := json.Marshal(message)
-		if err != nil {
-			fmt.Fprintf(conn, "Error marshaling response: %v", err)
-			return
-		}
-		fmt.Println("Sending response to node", request.NodeID)
-		_, err = conn.Write(responseBytes)
-		if err != nil {
-			log.Printf("Error writing response to connection: %v", err)
-			return
-		}
-		time.Sleep(300 * time.Millisecond)
-	}
-}
-
-func (n *Node) generateBlockForRequest(blockID int) *Block {
-
-	txs := GenerateTransactions(1000)
-	block := &Block{
-		ID:           blockID,
-		PreviousHash: "",
-		Transactions: txs,
-		Nonce:        0,
-		Timestamp:    time.Now().Unix(),
-		Hash:         "",
-	}
-	/// size of the block in byte
-	blockBytes, _ := json.Marshal(block)
-	fmt.Printf("Size of the block: %d bytes\n", len(blockBytes))
-	block.Hash = GenerateBlockHash(*block)
-	return block
-}
-
 func (n *Node) sendChunkRequest(blockID int) {
+
+	n.Metrics = &SyncMetrics{
+		NodeID:    n.ID,
+		StartTime: time.Now(),
+	}
+
 	request := &ChunkRequest{
 		NodeID:         n.ID,
 		BlockID:        blockID,
@@ -114,6 +65,95 @@ func (n *Node) sendChunkRequest(blockID int) {
 	}
 
 	n.readResponse(conn)
+	// Update and display metrics
+	n.Metrics.EndTime = time.Now()
+	n.Metrics.TotalDuration = n.Metrics.EndTime.Sub(n.Metrics.StartTime)
+	fmt.Printf("Sync Metrics for Node %d: %+v\n", n.ID, n.Metrics)
+}
+
+func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
+	block := n.generateBlockForRequest(request.BlockID)
+	txs := block.Transactions
+	fmt.Println("num of txs: ", len(txs))
+	for i := 0; i < len(block.Transactions); i += request.RequestSize {
+		// TODO
+		// Implement proof generation for chunk of transactions
+		chunk := txs[i:min(i+request.RequestSize, len(txs))]
+		proof, _ := generateProof(chunk)
+
+		// Serialize and send the response
+		response := ChunkResponse{
+			NodeID:       n.ID,
+			BlockID:      block.ID,
+			Transactions: txs[i:min(i+request.RequestSize, len(txs))],
+			Proof:        proof.LeftSiblings,
+			Success:      true,
+		}
+
+		var message = &Message{
+			From:    n.ID,
+			To:      request.NodeID,
+			Type:    "response",
+			Content: response,
+		}
+		if (i + request.RequestSize) >= len(txs) {
+			message.Type = "last_response"
+		}
+
+		responseBytes, err := json.Marshal(message)
+		if err != nil {
+			fmt.Fprintf(conn, "Error marshaling response: %v", err)
+			return
+		}
+		fmt.Println("Sending response to node", request.NodeID)
+		_, err = conn.Write(responseBytes)
+		if err != nil {
+			log.Printf("Error writing response to connection: %v", err)
+			return
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+}
+
+func (n *Node) generateBlockForRequest(blockID int) *Block {
+
+	txs := GenerateTransactions(1000)
+	block := &Block{
+		ID:           blockID,
+		PreviousHash: "",
+		Transactions: txs,
+		Nonce:        0,
+		Timestamp:    time.Now().Unix(),
+		Hash:         "",
+	}
+	/// size of the block in byte
+	blockBytes, _ := json.Marshal(block)
+	fmt.Printf("Size of the block: %d bytes\n", len(blockBytes))
+	block.Hash = GenerateBlockHash(*block)
+	return block
+}
+
+func generateProof(transactions []Transaction) (TransactionAccumulatorRangeProof, []TransactionInfo) {
+	var leftSiblings []string
+	var transactionInfos []TransactionInfo
+
+	for _, txn := range transactions {
+		hash := sha256.Sum256([]byte(txn.ID))
+		leftSiblings = append(leftSiblings, hex.EncodeToString(hash[:]))
+		transactionInfos = append(transactionInfos, TransactionInfo{TransactionHash: hex.EncodeToString(hash[:])})
+	}
+
+	return TransactionAccumulatorRangeProof{LeftSiblings: leftSiblings}, transactionInfos
+}
+
+func verifyProof(transactions []Transaction, proof TransactionAccumulatorRangeProof) bool {
+	for i, txn := range transactions {
+		hash := sha256.Sum256([]byte(txn.ID))
+		if proof.LeftSiblings[i] != hex.EncodeToString(hash[:]) {
+			return false
+		}
+	}
+	return true
 }
 
 func (n *Node) handleChunkResponse(response *ChunkResponse) {
@@ -128,9 +168,8 @@ func (n *Node) handleChunkResponse(response *ChunkResponse) {
 }
 
 func (n *Node) verifyChunk(response *ChunkResponse) bool {
-	// TODO
-	// Implement verification of chunk proof
-	return true
+	proof := TransactionAccumulatorRangeProof{LeftSiblings: response.Proof}
+	return verifyProof(response.Transactions, proof)
 }
 
 func (n *Node) integrateChunk(response *ChunkResponse) {

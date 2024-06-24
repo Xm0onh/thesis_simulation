@@ -9,8 +9,8 @@ import (
 
 const (
 	TXN_SIZE = 10000
-	N        = 9
-	K        = 5
+	N        = 15
+	K        = 10
 )
 
 type Transaction struct {

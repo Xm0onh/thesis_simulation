@@ -62,7 +62,7 @@ func (n *Node) handleIncomingConnection(conn net.Conn) {
 			break
 		}
 
-		fmt.Printf("Node %d read %d bytes: %s\n", n.ID, length, string(buf[:length])) // Log raw data for debugging
+		// fmt.Printf("Node %d read %d bytes: %s\n", n.ID, length, string(buf[:length])) // Log raw data for debugging
 
 		var message Message
 		if err := json.Unmarshal(buf[:length], &message); err != nil {

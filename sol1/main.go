@@ -8,9 +8,11 @@ import (
 )
 
 const (
-	TXN_SIZE = 10000
-	N        = 20
-	K        = 10
+	TXN_SIZE    = 10000
+	N           = 40
+	K           = 20
+	BUFFER_SIZE = 65536
+	BANDWIDTH   = 4
 )
 
 type Transaction struct {

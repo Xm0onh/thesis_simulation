@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	TXN_SIZE   = 10000
-	CHUNK_SIZE = 1000
+	TXN_SIZE    = 10000
+	CHUNK_SIZE  = 1000
+	BUFFER_SIZE = 65536
 )
 
 type Transaction struct {

@@ -95,7 +95,7 @@ func (n *Node) handleMessage(message Message, conn net.Conn) {
 }
 
 func (n *Node) readResponse(conn net.Conn) {
-	var buf [4096]byte
+	var buf [BUFFER_SIZE]byte
 	var accumulatedData bytes.Buffer
 
 	for {

@@ -51,7 +51,7 @@ func InitializeNetwork(numNodes int, startingPort int) *Network {
 func (n *Node) handleIncomingConnection(conn net.Conn) {
 	fmt.Println("Node", n.ID, "handling connection from", conn.RemoteAddr().String())
 	defer conn.Close()
-	var buf [4096]byte
+	var buf [BUFFER_SIZE]byte
 
 	for {
 		length, err := conn.Read(buf[:])
@@ -96,7 +96,7 @@ func (n *Node) handleMessage(message Message, conn net.Conn) {
 }
 
 func (n *Node) readResponse(conn net.Conn) {
-	var buf [4096]byte
+	var buf [BUFFER_SIZE]byte
 	var accumulatedData bytes.Buffer
 
 	for {

@@ -36,6 +36,9 @@ func (n *Node) sendChunkRequest(blockID int) {
 
 	for i := 1; i < N; i++ {
 		wg.Add(1)
+		if (i%BANDWIDTH == 0) && (i != 0) {
+			time.Sleep(20 * time.Millisecond)
+		}
 		go func(i int) {
 			defer wg.Done()
 			request := &ChunkRequest{

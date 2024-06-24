@@ -76,7 +76,7 @@ type SyncMetrics struct {
 func main() {
 	network := InitializeNetwork(5, 8000)
 	for _, node := range network.Nodes {
-		node.Start()
+		go node.Start()
 	}
 	time.Sleep(1 * time.Second)
 	fallingBehindNode := network.Nodes[0]

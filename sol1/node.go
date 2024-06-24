@@ -42,14 +42,14 @@ func (n *Node) sendChunkRequest(blockID int) {
 				NodeID:  n.ID,
 				BlockID: blockID,
 			}
-	
+
 			message := &Message{
 				From:    n.ID,
 				To:      -1,
 				Type:    "request",
 				Content: request,
 			}
-	
+
 			requestData, err := json.Marshal(message)
 			if err != nil {
 				log.Fatalf("Error marshaling request: %v", err)
@@ -83,10 +83,15 @@ func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 	block := n.generateBlockForRequest(request.BlockID)
 	blockBytes, _ := json.Marshal(block)
 	chunks := GenerateCodedChunks(blockBytes)
+	rootHash, proofs := CreateVectorCommitment(chunks)
+	for i, chunk := range chunks {
+		chunk.Proof = *proofs[i]
+	}
 
 	response := ChunkResponse{
-		NodeID: n.ID,
-		Chunk:  &chunks[n.ID],
+		NodeID:     n.ID,
+		Chunk:      &chunks[n.ID],
+		Commitment: rootHash,
 	}
 
 	var message = &Message{
@@ -131,8 +136,17 @@ func (n *Node) generateBlockForRequest(blockID int) *Block {
 
 func (n *Node) handleChunkResponse(response *ChunkResponse) {
 
-	n.ReceivedChunks[response.NodeID] = *response.Chunk
-	fmt.Println("Total chunks received:", len(n.ReceivedChunks))
+	n.Metrics.TotalChunks++
+	startTime := time.Now()
+	if VerifyChunk(response.Commitment, *response.Chunk, &response.Chunk.Proof) {
+		n.Metrics.VerificationTime += time.Since(startTime)
+		n.Metrics.SuccessfulChunks++
+		n.ReceivedChunks[response.NodeID] = *response.Chunk
+		fmt.Println("Chunk integrated successfully.")
+	} else {
+		n.Metrics.FailedChunks++
+		fmt.Println("Failed to verify chunk.")
+	}
 	if len(n.ReceivedChunks) == K {
 		fmt.Println("Enough chunks recieved")
 		decodedMessage, err := Decode(n.ReceivedChunks)
@@ -141,16 +155,4 @@ func (n *Node) handleChunkResponse(response *ChunkResponse) {
 		}
 		fmt.Println("Decoded message:", len(decodedMessage))
 	}
-	// n.Metrics.TotalChunks++
-	// if n.verifyChunk(response) {
-	// 	n.Metrics.SuccessfulChunks++
-	// 	n.integrateChunk(response)
-	// 	fmt.Println("Chunk integrated successfully.")
-	// } else {
-	// 	n.Metrics.FailedChunks++
-	// 	fmt.Println("Failed to verify chunk.")
-	// 	// TODO: Implement retry logic
-
-	// }
-
 }

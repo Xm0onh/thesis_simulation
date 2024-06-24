@@ -20,15 +20,15 @@ func CreateVectorCommitment(chunks []Chunk) ([]byte, []*merkle.Proof) {
 	return rootHash, proofs
 }
 
-func VerifyChunk(commitment []byte, chunk Chunk, proof *merkle.Proof) bool {
+func VerifyChunk(rootHash []byte, chunk Chunk, proof *merkle.Proof) bool {
 	// Size of proof and commitment in byte
 	proofSize := reflect.TypeOf(*proof).Size()
-	commitmentSize := reflect.TypeOf(commitment).Size()
+	commitmentSize := reflect.TypeOf(rootHash).Size()
 	fmt.Println("Size of proof and commitment in byte: ", proofSize, commitmentSize)
 
 	// Capture the time for verification
 	start := time.Now()
-	err := proof.Verify(commitment, chunk.Data)
+	err := proof.Verify(rootHash, chunk.Data)
 	fmt.Println("Time taken for verification: ", time.Since(start))
 	return err == nil
 }

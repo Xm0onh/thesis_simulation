@@ -64,8 +64,9 @@ type ChunkRequest struct {
 }
 
 type ChunkResponse struct {
-	NodeID int    // ID of the responding node
-	Chunk  *Chunk // Data chunk with proof
+	NodeID     int    // ID of the responding node
+	Chunk      *Chunk // Data chunk with proof
+	Commitment []byte // Vector commitment for the chunks
 }
 
 type Chunk struct {

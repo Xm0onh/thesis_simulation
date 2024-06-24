@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+const (
+	TXN_SIZE   = 10000
+	CHUNK_SIZE = 100
+)
+
 type Transaction struct {
 	ID        string // Unique identifier for the transaction
 	Content   string // Content or data of the transaction
@@ -32,6 +37,7 @@ type Node struct {
 	BlockHeight   int            // Current height of the blockchain this node maintains
 	ConsensusRole string         // Role of the node in the consensus process, e.g., proposer, validator
 	Metrics       *SyncMetrics   // Metrics for tracking synchronization performance
+	BlackList     map[int]bool   // List of nodes to ignore during synchronization
 
 }
 
@@ -73,6 +79,7 @@ type SyncMetrics struct {
 	SuccessfulChunks  int           // Number of successfully verified chunks
 	FailedChunks      int           // Number of chunks that failed verification
 	TotalDuration     time.Duration // Total time taken for the synchronization process
+	VerificationTime  time.Duration // Time taken to verify all chunks
 }
 
 type TransactionAccumulatorRangeProof struct {
@@ -84,11 +91,11 @@ type TransactionInfo struct {
 }
 
 func main() {
-	network := InitializeNetwork(5, 8000)
+	network := InitializeNetwork(10, 8000)
 	for _, node := range network.Nodes {
 		go node.Start()
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 	fallingBehindNode := network.Nodes[0]
 	fallingBehindNode.sendChunkRequest(0)
 	select {}

@@ -26,15 +26,19 @@ func (n *Node) Start() {
 func (n *Node) sendChunkRequest(blockID int) {
 
 	n.Metrics = &SyncMetrics{
-		NodeID:    n.ID,
-		StartTime: time.Now(),
+		NodeID:           n.ID,
+		StartTime:        time.Now(),
+		VerificationTime: 0,
+		TotalChunks:      0,
+		SuccessfulChunks: 0,
+		FailedChunks:     0,
 	}
 
 	request := &ChunkRequest{
 		NodeID:         n.ID,
 		BlockID:        blockID,
 		TransactionIDs: []string{},
-		RequestSize:    100,
+		RequestSize:    CHUNK_SIZE,
 	}
 
 	message := &Message{
@@ -76,8 +80,6 @@ func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 	txs := block.Transactions
 	fmt.Println("num of txs: ", len(txs))
 	for i := 0; i < len(block.Transactions); i += request.RequestSize {
-		// TODO
-		// Implement proof generation for chunk of transactions
 		chunk := txs[i:min(i+request.RequestSize, len(txs))]
 		proof, _ := generateProof(chunk)
 
@@ -117,7 +119,7 @@ func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 
 func (n *Node) generateBlockForRequest(blockID int) *Block {
 
-	txs := GenerateTransactions(1000)
+	txs := GenerateTransactions(TXN_SIZE)
 	block := &Block{
 		ID:           blockID,
 		PreviousHash: "",
@@ -157,18 +159,24 @@ func verifyProof(transactions []Transaction, proof TransactionAccumulatorRangePr
 }
 
 func (n *Node) handleChunkResponse(response *ChunkResponse) {
-
+	n.Metrics.TotalChunks++
 	if n.verifyChunk(response) {
+		n.Metrics.SuccessfulChunks++
 		n.integrateChunk(response)
 		fmt.Println("Chunk integrated successfully.")
 	} else {
+		n.Metrics.FailedChunks++
 		fmt.Println("Failed to verify chunk.")
+		// TODO: Implement retry logic
+
 	}
 
 }
 
 func (n *Node) verifyChunk(response *ChunkResponse) bool {
+	startTime := time.Now()
 	proof := TransactionAccumulatorRangeProof{LeftSiblings: response.Proof}
+	n.Metrics.VerificationTime += time.Since(startTime)
 	return verifyProof(response.Transactions, proof)
 }
 

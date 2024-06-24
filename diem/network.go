@@ -16,17 +16,23 @@ func InitializeNetwork(numNodes int, startingPort int) *Network {
 	for i := 0; i < numNodes; i++ {
 		address := fmt.Sprintf("localhost:%d", startingPort+i)
 		listener, err := net.Listen("tcp", address)
+		byzantine := false
 		if err != nil {
 			log.Fatalf("Error starting listener: %v", err)
 		}
 		fmt.Println("Node", i, "listening on", address)
+		if (i%10) == 0 && i != 0 {
+			fmt.Println("Node", i, "is Byzantine")
+			byzantine = true
+		}
 		node := &Node{
 			ID:          i,
 			Address:     address,
 			Listener:    listener,
 			Peers:       make(map[int]string),
 			Blockchain:  make([]*Block, 0),
-			IsByzantine: false,
+			IsByzantine: byzantine,
+			BlackList:   make(map[int]bool),
 		}
 		network.Nodes[i] = node
 	}

@@ -21,12 +21,13 @@ func GenerateCodedChunks(data []byte) []Chunk {
 		panic(err)
 	}
 
+	// fmt.Println("Size of data in bytes: ", len(shards[0]))
 	// Encode parity shards
+
 	err = enc.Encode(shards)
 	if err != nil {
 		panic(err)
 	}
-
 	// Convert shards to chunks
 	chunks := make([]Chunk, N)
 	for i := 0; i < N; i++ {

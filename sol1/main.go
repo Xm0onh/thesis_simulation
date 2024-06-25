@@ -9,10 +9,10 @@ import (
 
 const (
 	TXN_SIZE    = 10000
-	N           = 40
-	K           = 20
+	N           = 40 // size of each coded chunk is TXN_SIZE/K !!!
+	K           = 20 // How can we choose K?
 	BUFFER_SIZE = 65536
-	BANDWIDTH   = 4
+	BANDWIDTH   = 4 // BANDWIDTH * (TXN_SIZE/N) = CHUNK_SIZE in diem/main.go
 )
 
 type Transaction struct {

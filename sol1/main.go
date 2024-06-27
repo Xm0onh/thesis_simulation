@@ -1,18 +1,23 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"time"
 
 	"github.com/tendermint/tendermint/crypto/merkle"
 )
 
+// Assuming upload bandwidth is 10 Mbps - download bandwidth is 109 Mbps
+// K = N - f | f = 10% of N
 const (
-	TXN_SIZE    = 10000
-	N           = 40 // size of each coded chunk is TXN_SIZE/K !!!
-	K           = 20 // How can we choose K?
-	BUFFER_SIZE = 65536
-	BANDWIDTH   = 4 // BANDWIDTH * (TXN_SIZE/N) = CHUNK_SIZE in diem/main.go
+	TXN_SIZE      = 100000
+	N             = 100      // size of each coded chunk is TXN_SIZE/K !!!
+	K             = 90       // How can we choose K?
+	BUFFER_SIZE   = 65536    // 2^16
+	BANDWIDTH     = 12500000 // 10 Megabit per sec = 1.25 * 10^6 bytes per second
+	NETWORK_DELAY = 0 * time.Millisecond
+	COUNTER       = 72 // Bandwdith / (F/K) -- F is the size of the file in bytes
 )
 
 type Transaction struct {
@@ -89,6 +94,17 @@ type SyncMetrics struct {
 }
 
 func main() {
+	// Size of a single transaction in bytes]
+	fmt.Printf("Size of a single transaction: %d bytes\n", SizeOfOneTransaction())
+	// Size of the entire file in bytes
+	fmt.Printf("Size of the entire file: %d bytes\n", SizeOfTheFile())
+	// Maximum size of a chunk respected to the bandwidth
+	fmt.Printf("Maximum size of a chunk: %d txs\n", TXN_SIZE/(SizeOfTheFile()/BANDWIDTH))
+	// Size of each coded chunk in bytes
+	fmt.Printf("Size of each coded chunk: %d bytes\n", SizeOfTheFile()/K)
+	// Maximum number of coded chunk respected to the bandwidth
+	fmt.Printf("Maximum number of coded chunks: %d\n", BANDWIDTH/(SizeOfTheFile()/K))
+
 	network := InitializeNetwork(N, 8000)
 	for _, node := range network.Nodes {
 		go node.Start()

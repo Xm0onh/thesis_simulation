@@ -113,7 +113,8 @@ func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 			log.Printf("Error writing response to connection: %v", err)
 			return
 		}
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(1 * time.Second)
+		time.Sleep(NETWORK_DELAY)
 	}
 }
 

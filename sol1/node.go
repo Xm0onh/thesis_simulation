@@ -36,8 +36,8 @@ func (n *Node) sendChunkRequest(blockID int) {
 
 	for i := 1; i < N; i++ {
 		wg.Add(1)
-		if (i%BANDWIDTH == 0) && (i != 0) {
-			time.Sleep(20 * time.Millisecond)
+		if (i%COUNTER == 0) && (i != 0) {
+			time.Sleep(1 * time.Second)
 		}
 		go func(i int) {
 			defer wg.Done()
@@ -77,9 +77,7 @@ func (n *Node) sendChunkRequest(blockID int) {
 	wg.Wait()
 
 	// Update and display metrics
-	n.Metrics.EndTime = time.Now()
-	n.Metrics.TotalDuration = n.Metrics.EndTime.Sub(n.Metrics.StartTime)
-	fmt.Printf("Sync Metrics for Node %d: %+v\n", n.ID, n.Metrics)
+
 }
 
 func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
@@ -111,6 +109,7 @@ func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 		return
 	}
 	fmt.Println("Sending response to node", request.NodeID)
+	time.Sleep(NETWORK_DELAY)
 	_, err = conn.Write(responseBytes)
 	if err != nil {
 		log.Printf("Error writing response to connection: %v", err)
@@ -151,12 +150,16 @@ func (n *Node) handleChunkResponse(response *ChunkResponse) {
 		fmt.Println("Failed to verify chunk.")
 	}
 	if len(n.ReceivedChunks) == K {
-		fmt.Println("Enough chunks recieved")
+		fmt.Println("Enough chunks recieved, size of chunk is", len(n.ReceivedChunks[0].Data))
 		decodedMessage, err := Decode(n.ReceivedChunks)
 		if err != nil {
 			log.Fatalf("Error decoding message: %v", err)
 		}
 		fmt.Println("Decoded message:", len(decodedMessage))
+		n.Metrics.EndTime = time.Now()
+		n.Metrics.TotalDuration = n.Metrics.EndTime.Sub(n.Metrics.StartTime)
+		fmt.Printf("Sync Metrics for Node %d: %+v\n", n.ID, n.Metrics)
+		panic("Sync complete")
 		// size of message in byte
 	}
 }

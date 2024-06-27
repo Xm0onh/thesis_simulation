@@ -6,9 +6,10 @@ import (
 )
 
 const (
-	TXN_SIZE    = 10000
-	CHUNK_SIZE  = 1000
-	BUFFER_SIZE = 65536
+	TXN_SIZE      = 100000
+	CHUNK_SIZE    = 8333
+	BUFFER_SIZE   = 65536
+	NETWORK_DELAY = 300 * time.Millisecond
 )
 
 type Transaction struct {

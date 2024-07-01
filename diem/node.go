@@ -8,6 +8,8 @@ import (
 	"log"
 	"net"
 	"time"
+
+	"golang.org/x/exp/rand"
 )
 
 func (n *Node) Start() {
@@ -53,22 +55,31 @@ func (n *Node) sendChunkRequest(blockID int) {
 	if err != nil {
 		log.Fatalf("Error marshaling request: %v", err)
 	}
-
-	// selectedPeer := n.Peers[rand.Intn(len(n.Peers))]
-	selectedPeer := n.Peers[2]
-	conn, err := net.Dial("tcp", selectedPeer)
-	if err != nil {
-		log.Fatalf("Error connecting to peer: %v", err)
+	for {
+		// selectedPeer := n.Peers[rand.Intn(len(n.Peers))]
+		indexPeer := n.selectRandomPeer()
+		selectedPeer := n.Peers[indexPeer]
+		conn, err := net.Dial("tcp", selectedPeer)
+		if err != nil {
+			log.Fatalf("Error connecting to peer: %v", err)
+		}
+		fmt.Println("my address: ", conn.LocalAddr().String())
+		// defer conn.Close()
+		_, err = conn.Write(requestData)
+		if err != nil {
+			log.Printf("Error writing response to connection: %v", err)
+			return
+		}
+		readDeadline := time.Now().Add(10 * time.Second)
+		conn.SetReadDeadline(readDeadline)
+		res := n.readResponse(conn, indexPeer)
+		if res {
+			break
+		} else {
+			fmt.Println("Retrying...")
+			continue
+		}
 	}
-	fmt.Println("my address: ", conn.LocalAddr().String())
-	// defer conn.Close()
-	_, err = conn.Write(requestData)
-	if err != nil {
-		log.Printf("Error writing response to connection: %v", err)
-		return
-	}
-
-	n.readResponse(conn)
 	// Update and display metrics
 	n.Metrics.EndTime = time.Now()
 	n.Metrics.TotalDuration = n.Metrics.EndTime.Sub(n.Metrics.StartTime)
@@ -188,4 +199,22 @@ func (n *Node) verifyChunk(response *ChunkResponse) bool {
 func (n *Node) integrateChunk(response *ChunkResponse) {
 	// TODO
 	// Implement integration of chunk into blockchain
+}
+
+func (n *Node) selectRandomPeer() int {
+	availablePeers := []int{}
+	for peerID := range n.Peers {
+		if !n.BlackList[peerID] && peerID != n.ID {
+			availablePeers = append(availablePeers, peerID)
+		}
+	}
+	// printing the blacklisted peers
+	fmt.Println("Blacklisted peers: ", n.BlackList)
+
+	if len(availablePeers) == 0 {
+		return -1
+	}
+
+	rand.Seed(uint64(time.Now().UnixNano()))
+	return availablePeers[rand.Intn(len(availablePeers))]
 }

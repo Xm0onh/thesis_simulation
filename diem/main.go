@@ -95,7 +95,7 @@ type TransactionInfo struct {
 }
 
 func main() {
-	faultyNodes := []int{0, 1, 2, 3, 4}
+	faultyNodes := []int{}
 	InitializeAdversary(faultyNodes)
 
 	network := InitializeNetwork(10, 8000)

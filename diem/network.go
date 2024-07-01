@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"time"
 )
 
 func InitializeAdversary(faultyNode []int) {
@@ -100,15 +101,18 @@ func (n *Node) handleMessage(message Message, conn net.Conn) {
 	}
 }
 
-func (n *Node) readResponse(conn net.Conn) {
+func (n *Node) readResponse(conn net.Conn, connectedPeer int) bool {
 	var buf [BUFFER_SIZE]byte
 	var accumulatedData bytes.Buffer
 
 	for {
+		conn.SetReadDeadline(time.Now().Add(10 * time.Second)) // Reset deadline before each read
 		length, err := conn.Read(buf[:])
 		if err != nil {
 			if err != io.EOF {
 				log.Printf("Node %d error reading response: %v", n.ID, err)
+				n.BlackList[connectedPeer] = true
+				return false
 			}
 			break
 		}
@@ -149,6 +153,7 @@ func (n *Node) readResponse(conn net.Conn) {
 			}
 		}
 	}
+	return true
 }
 
 // Helper function to find the closing brace of a JSON object

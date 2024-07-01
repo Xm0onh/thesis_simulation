@@ -79,42 +79,46 @@ func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 	block := n.generateBlockForRequest(request.BlockID)
 	txs := block.Transactions
 	fmt.Println("num of txs: ", len(txs))
-	for i := 0; i < len(block.Transactions); i += request.RequestSize {
-		chunk := txs[i:min(i+request.RequestSize, len(txs))]
-		proof, _ := generateProof(chunk)
+	if n.IsByzantine {
+		// DOING NOTHING
+	} else {
+		for i := 0; i < len(block.Transactions); i += request.RequestSize {
+			chunk := txs[i:min(i+request.RequestSize, len(txs))]
+			proof, _ := generateProof(chunk)
 
-		// Serialize and send the response
-		response := ChunkResponse{
-			NodeID:       n.ID,
-			BlockID:      block.ID,
-			Transactions: txs[i:min(i+request.RequestSize, len(txs))],
-			Proof:        proof.LeftSiblings,
-			Success:      true,
-		}
+			// Serialize and send the response
+			response := ChunkResponse{
+				NodeID:       n.ID,
+				BlockID:      block.ID,
+				Transactions: txs[i:min(i+request.RequestSize, len(txs))],
+				Proof:        proof.LeftSiblings,
+				Success:      true,
+			}
 
-		var message = &Message{
-			From:    n.ID,
-			To:      request.NodeID,
-			Type:    "response",
-			Content: response,
-		}
-		if (i + request.RequestSize) >= len(txs) {
-			message.Type = "last_response"
-		}
+			var message = &Message{
+				From:    n.ID,
+				To:      request.NodeID,
+				Type:    "response",
+				Content: response,
+			}
+			if (i + request.RequestSize) >= len(txs) {
+				message.Type = "last_response"
+			}
 
-		responseBytes, err := json.Marshal(message)
-		if err != nil {
-			fmt.Fprintf(conn, "Error marshaling response: %v", err)
-			return
+			responseBytes, err := json.Marshal(message)
+			if err != nil {
+				fmt.Fprintf(conn, "Error marshaling response: %v", err)
+				return
+			}
+			fmt.Println("Sending response to node", request.NodeID)
+			_, err = conn.Write(responseBytes)
+			if err != nil {
+				log.Printf("Error writing response to connection: %v", err)
+				return
+			}
+			time.Sleep(1 * time.Second)
+			time.Sleep(NETWORK_DELAY)
 		}
-		fmt.Println("Sending response to node", request.NodeID)
-		_, err = conn.Write(responseBytes)
-		if err != nil {
-			log.Printf("Error writing response to connection: %v", err)
-			return
-		}
-		time.Sleep(1 * time.Second)
-		time.Sleep(NETWORK_DELAY)
 	}
 }
 

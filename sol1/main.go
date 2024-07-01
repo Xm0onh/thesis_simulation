@@ -11,14 +11,18 @@ import (
 // Assuming upload bandwidth is 10 Mbps - download bandwidth is 109 Mbps
 // K = N - f | f = 10% of N
 const (
-	TXN_SIZE      = 100000
-	N             = 100      // size of each coded chunk is TXN_SIZE/K !!!
-	K             = 90       // How can we choose K?
-	BUFFER_SIZE   = 65536    // 2^16
-	BANDWIDTH     = 12500000 // 10 Megabit per sec = 1.25 * 10^6 bytes per second
-	NETWORK_DELAY = 0 * time.Millisecond
-	COUNTER       = 72 // Bandwdith / (F/K) -- F is the size of the file in bytes
+	TXN_SIZE         = 1_000_000
+	N                = 100      // size of each coded chunk is TXN_SIZE/K !!!
+	K                = 90       // How can we choose K?
+	BUFFER_SIZE      = 65536    // 2^16
+	BANDWIDTH        = 12500000 // 10 Megabit per sec = 1.25 * 10^6 bytes per second
+	UPLOAD_BANDWIDTH = 1250000
+	// 8765437
+	NETWORK_DELAY = 300 * time.Millisecond
+	COUNTER       = 7 // Bandwdith / (F/K) -- F is the size of the file in bytes
 )
+
+var F = make(map[int]bool)
 
 type Transaction struct {
 	ID        string // Unique identifier for the transaction
@@ -99,11 +103,14 @@ func main() {
 	// Size of the entire file in bytes
 	fmt.Printf("Size of the entire file: %d bytes\n", SizeOfTheFile())
 	// Maximum size of a chunk respected to the bandwidth
-	fmt.Printf("Maximum size of a chunk: %d txs\n", TXN_SIZE/(SizeOfTheFile()/BANDWIDTH))
+	fmt.Printf("Maximum size of a chunk: %d txs\n", TXN_SIZE/(SizeOfTheFile()/UPLOAD_BANDWIDTH))
 	// Size of each coded chunk in bytes
 	fmt.Printf("Size of each coded chunk: %d bytes\n", SizeOfTheFile()/K)
 	// Maximum number of coded chunk respected to the bandwidth
 	fmt.Printf("Maximum number of coded chunks: %d\n", BANDWIDTH/(SizeOfTheFile()/K))
+
+	faultyNodes := []int{0, 1, 2, 3, 4}
+	InitializeAdversary(faultyNodes)
 
 	network := InitializeNetwork(N, 8000)
 	for _, node := range network.Nodes {

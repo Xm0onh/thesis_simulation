@@ -9,6 +9,12 @@ import (
 	"net"
 )
 
+func InitializeAdversary(faultyNode []int) {
+	for _, nodeID := range faultyNode {
+		F[nodeID] = true
+	}
+}
+
 func InitializeNetwork(numNodes int, startingPort int) *Network {
 	network := &Network{
 		Nodes: make(map[int]*Node),
@@ -21,7 +27,7 @@ func InitializeNetwork(numNodes int, startingPort int) *Network {
 			log.Fatalf("Error starting listener: %v", err)
 		}
 		fmt.Println("Node", i, "listening on", address)
-		if (i%10) == 0 && i != 0 {
+		if F[i] {
 			fmt.Println("Node", i, "is Byzantine")
 			byzantine = true
 		}

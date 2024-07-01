@@ -6,11 +6,13 @@ import (
 )
 
 const (
-	TXN_SIZE      = 100000
-	CHUNK_SIZE    = 8333
+	TXN_SIZE      = 1_000_000
+	CHUNK_SIZE    = 7936
 	BUFFER_SIZE   = 65536
-	NETWORK_DELAY = 300 * time.Millisecond
+	NETWORK_DELAY = 0 * time.Millisecond
 )
+
+var F = make(map[int]bool)
 
 type Transaction struct {
 	ID        string // Unique identifier for the transaction
@@ -93,6 +95,9 @@ type TransactionInfo struct {
 }
 
 func main() {
+	faultyNodes := []int{0, 1, 2, 3, 4}
+	InitializeAdversary(faultyNodes)
+
 	network := InitializeNetwork(10, 8000)
 	for _, node := range network.Nodes {
 		go node.Start()

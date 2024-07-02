@@ -101,17 +101,19 @@ func (n *Node) handleMessage(message Message, conn net.Conn) {
 	}
 }
 
-func (n *Node) readResponse(conn net.Conn) {
+func (n *Node) readResponse(conn net.Conn, connectedPeer int) bool {
 	var buf [BUFFER_SIZE]byte
 	var accumulatedData bytes.Buffer
 
 	for {
+		// conn.SetReadDeadline(time.Now().Add(10 * time.Second)) // Reset deadline before each read
 		length, err := conn.Read(buf[:])
 		if err != nil {
 			if err != io.EOF {
 				log.Printf("Node %d error reading response: %v", n.ID, err)
 			}
-			break
+			n.BlackList[connectedPeer] = true
+			return false
 		}
 
 		// fmt.Printf("Node %d read %d bytes\n", n.ID, length)
@@ -123,14 +125,11 @@ func (n *Node) readResponse(conn net.Conn) {
 			fullMessage := data[:closingIndex+1]
 			accumulatedData.Next(closingIndex + 1) // Remove processed bytes
 
-			// fmt.Printf("Node %d received full message: %s\n", n.ID, string(fullMessage))
-
 			var message Message
 			if err := json.Unmarshal(fullMessage, &message); err != nil {
 				log.Printf("Node %d error unmarshaling response: %v", n.ID, err)
 				continue
 			}
-			// fmt.Printf("Node %d received message: %v\n", n.ID, message)
 
 			if message.Type == "response" {
 				var response ChunkResponse
@@ -148,6 +147,7 @@ func (n *Node) readResponse(conn net.Conn) {
 			}
 		}
 	}
+	return true
 }
 
 // Helper function to find the closing brace of a JSON object

@@ -7,6 +7,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"golang.org/x/exp/rand"
 )
 
 func (n *Node) Start() {
@@ -69,8 +71,11 @@ func (n *Node) sendChunkRequest(blockID int) {
 				log.Printf("Error writing response to connection: %v", err)
 				return
 			}
-
-			n.readResponse(conn)
+			readDeadline := time.Now().Add(10 * time.Second)
+			conn.SetReadDeadline(readDeadline)
+			if !n.readResponse(conn, i) {
+				fmt.Println("Failed to read response from peer", i)
+			}
 		}(i)
 
 	}
@@ -86,38 +91,42 @@ func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 	fmt.Println("Size of block in bytes: ", len(blockBytes))
 	chunks := GenerateCodedChunks(blockBytes)
 	rootHash, proofs := CreateVectorCommitment(chunks)
-	for i := range chunks {
-		chunks[i].Proof = *proofs[i]
-	}
+	if n.IsByzantine {
+		// DOINT NOTHING
+	} else {
+		for i := range chunks {
+			chunks[i].Proof = *proofs[i]
+		}
 
-	response := ChunkResponse{
-		NodeID:     n.ID,
-		Chunk:      &chunks[n.ID],
-		Commitment: rootHash,
-	}
+		response := ChunkResponse{
+			NodeID:     n.ID,
+			Chunk:      &chunks[n.ID],
+			Commitment: rootHash,
+		}
 
-	var message = &Message{
-		From:    n.ID,
-		To:      request.NodeID,
-		Type:    "response",
-		Content: response,
-	}
+		var message = &Message{
+			From:    n.ID,
+			To:      request.NodeID,
+			Type:    "response",
+			Content: response,
+		}
 
-	responseBytes, err := json.Marshal(message)
-	if err != nil {
-		fmt.Fprintf(conn, "Error marshaling response: %v", err)
-		return
-	}
-	fmt.Println("Sending response to node", request.NodeID)
-	time.Sleep(NETWORK_DELAY)
-	// Upload bandwidth limitation:
-	bandwidthLimit := len(responseBytes) / UPLOAD_BANDWIDTH
-	fmt.Println("Bandwidth limit: ", bandwidthLimit)
-	// time.Sleep(time.Duration(bandwidthLimit) * time.Second)
-	_, err = conn.Write(responseBytes)
-	if err != nil {
-		log.Printf("Error writing response to connection: %v", err)
-		return
+		responseBytes, err := json.Marshal(message)
+		if err != nil {
+			fmt.Fprintf(conn, "Error marshaling response: %v", err)
+			return
+		}
+		fmt.Println("Sending response to node", request.NodeID)
+		time.Sleep(NETWORK_DELAY)
+		// Upload bandwidth limitation:
+		bandwidthLimit := len(responseBytes) / UPLOAD_BANDWIDTH
+		fmt.Println("Bandwidth limit: ", bandwidthLimit)
+		// time.Sleep(time.Duration(bandwidthLimit) * time.Second)
+		_, err = conn.Write(responseBytes)
+		if err != nil {
+			log.Printf("Error writing response to connection: %v", err)
+			return
+		}
 	}
 
 }
@@ -166,4 +175,21 @@ func (n *Node) handleChunkResponse(response *ChunkResponse) {
 		panic("Sync complete")
 		// size of message in byte
 	}
+}
+
+func (n *Node) selectRandomPeer() int {
+	availablePeers := []int{}
+	for peerID := range n.Peers {
+		if !n.BlackList[peerID] && peerID != n.ID {
+			availablePeers = append(availablePeers, peerID)
+		}
+	}
+	fmt.Println("Blacklisted peers: ", n.BlackList)
+
+	if len(availablePeers) == 0 {
+		return -1
+	}
+
+	rand.Seed(uint64(time.Now().UnixNano()))
+	return availablePeers[rand.Intn(len(availablePeers))]
 }

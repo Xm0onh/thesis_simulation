@@ -70,8 +70,8 @@ func (n *Node) sendChunkRequest(blockID int) {
 			log.Printf("Error writing response to connection: %v", err)
 			return
 		}
-		readDeadline := time.Now().Add(10 * time.Second)
-		conn.SetReadDeadline(readDeadline)
+		// readDeadline := time.Now().Add(10 * time.Second)
+		// conn.SetReadDeadline(readDeadline)
 		res := n.readResponse(conn, indexPeer)
 		if res {
 			break

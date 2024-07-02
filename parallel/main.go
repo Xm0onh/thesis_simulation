@@ -109,7 +109,7 @@ func main() {
 	// Maximum number of coded chunk respected to the bandwidth
 	fmt.Printf("Maximum number of coded chunks: %d\n", BANDWIDTH/(SizeOfTheFile()/K))
 
-	faultyNodes := []int{0, 1, 2, 3, 4}
+	faultyNodes := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}
 	InitializeAdversary(faultyNodes)
 
 	network := InitializeNetwork(N, 8000)

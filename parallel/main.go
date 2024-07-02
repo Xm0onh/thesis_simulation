@@ -109,15 +109,14 @@ func main() {
 	fmt.Printf("Size of each coded chunk: %d bytes\n", SizeOfTheFile()/N)
 	// Maximum number of coded chunk respected to the bandwidth
 	fmt.Printf("Maximum number of coded chunks: %d\n", BANDWIDTH/(SizeOfTheFile()/N))
-	time.Sleep(10 * time.Second)
-	faultyNodes := []int{1, 2, 3, 4, 5, 6, 7, 8}
+	faultyNodes := []int{}
 	InitializeAdversary(faultyNodes)
 
 	network := InitializeNetwork(N, 8000)
 	for _, node := range network.Nodes {
 		go node.Start()
 	}
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 	fallingBehindNode := network.Nodes[0]
 	fallingBehindNode.sendChunkRequest(0)
 	select {}

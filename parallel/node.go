@@ -118,7 +118,7 @@ func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 		for i := range chunks {
 			chunks[i].Proof = *proofs[i]
 		}
-		fmt.Println("Sending chunk id", request.ChunkID, "to node", request.NodeID)
+		// fmt.Println("Sending chunk id", request.ChunkID, "to node", request.NodeID)
 		response := ChunkResponse{
 			NodeID:     n.ID,
 			Chunk:      &chunks[request.ChunkID],

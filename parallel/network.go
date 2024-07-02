@@ -97,7 +97,7 @@ func (n *Node) handleMessage(message Message, conn net.Conn) {
 			return
 		}
 
-		fmt.Println("Received chunk request from node regarding chunk", request.NodeID, request.ChunkID)
+		// fmt.Println("Received chunk request from node regarding chunk", request.NodeID, request.ChunkID)
 		n.processChunkRequest(&request, conn)
 	}
 }

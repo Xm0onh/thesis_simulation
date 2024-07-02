@@ -46,6 +46,7 @@ func (n *Node) sendChunkRequest(blockID int) {
 			request := &ChunkRequest{
 				NodeID:  n.ID,
 				BlockID: blockID,
+				ChunkID: i,
 			}
 
 			message := &Message{
@@ -71,10 +72,30 @@ func (n *Node) sendChunkRequest(blockID int) {
 				log.Printf("Error writing response to connection: %v", err)
 				return
 			}
-			readDeadline := time.Now().Add(10 * time.Second)
+			readDeadline := time.Now().Add(20 * time.Second)
 			conn.SetReadDeadline(readDeadline)
 			if !n.readResponse(conn, i) {
 				fmt.Println("Failed to read response from peer", i)
+				fmt.Println("Blacklisting peer", n.BlackList)
+				conn.Close()
+				for {
+					index := n.selectRandomPeer()
+					conn, err = net.Dial("tcp", n.Peers[index])
+					if err != nil {
+						log.Fatalf("Error connecting to peer: %v", err)
+					}
+					_, err = conn.Write(requestData)
+					if err != nil {
+						log.Printf("Error writing response to connection: %v", err)
+						return
+					}
+					if n.readResponse(conn, i) {
+						break
+					} else {
+						continue
+					}
+				}
+
 			}
 		}(i)
 
@@ -97,10 +118,11 @@ func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 		for i := range chunks {
 			chunks[i].Proof = *proofs[i]
 		}
-
+		fmt.Println("Sending chunk id", request.ChunkID, "to node", request.NodeID)
 		response := ChunkResponse{
 			NodeID:     n.ID,
-			Chunk:      &chunks[n.ID],
+			Chunk:      &chunks[request.ChunkID],
+			ChunkID:    request.ChunkID,
 			Commitment: rootHash,
 		}
 
@@ -156,13 +178,14 @@ func (n *Node) handleChunkResponse(response *ChunkResponse) {
 	// fmt.Println("response commtiment: ", response.Commitment, "proof", response.Chunk.Proof)
 	if VerifyChunk(response.Commitment, *response.Chunk, &response.Chunk.Proof, n) {
 		n.Metrics.SuccessfulChunks++
-		n.ReceivedChunks[response.NodeID] = *response.Chunk
+		n.ReceivedChunks[response.ChunkID] = *response.Chunk
 		fmt.Println("Chunk integrated successfully.")
+		fmt.Println("Number of received chunks ", len(n.ReceivedChunks))
 	} else {
 		n.Metrics.FailedChunks++
 		fmt.Println("Failed to verify chunk.")
 	}
-	if len(n.ReceivedChunks) == K {
+	if len(n.ReceivedChunks) == (N - 1) {
 		fmt.Println("Enough chunks recieved, size of chunk is", len(n.ReceivedChunks[0].Data))
 		decodedMessage, err := Decode(n.ReceivedChunks)
 		if err != nil {

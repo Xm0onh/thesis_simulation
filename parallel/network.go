@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"time"
 )
 
 func InitializeAdversary(faultyNode []int) {
@@ -96,7 +97,7 @@ func (n *Node) handleMessage(message Message, conn net.Conn) {
 			return
 		}
 
-		fmt.Println("Received chunk request from node", request.NodeID)
+		fmt.Println("Received chunk request from node regarding chunk", request.NodeID, request.ChunkID)
 		n.processChunkRequest(&request, conn)
 	}
 }
@@ -106,7 +107,7 @@ func (n *Node) readResponse(conn net.Conn, connectedPeer int) bool {
 	var accumulatedData bytes.Buffer
 
 	for {
-		// conn.SetReadDeadline(time.Now().Add(10 * time.Second)) // Reset deadline before each read
+		conn.SetReadDeadline(time.Now().Add(20 * time.Second)) // Reset deadline before each read
 		length, err := conn.Read(buf[:])
 		if err != nil {
 			if err != io.EOF {

@@ -8,10 +8,10 @@ import (
 )
 
 func GenerateDataChunks(data []byte) []Chunk {
-	chunkSize := (len(data) + K - 1) / K
-	chunks := make([]Chunk, K)
+	chunkSize := (len(data) + N - 1) / N
+	chunks := make([]Chunk, N)
 
-	for i := 0; i < K; i++ {
+	for i := 0; i < N; i++ {
 		start := i * chunkSize
 		end := start + chunkSize
 		if end > len(data) {
@@ -27,7 +27,7 @@ func GenerateDataChunks(data []byte) []Chunk {
 func Decode(chunks map[int]Chunk) (string, error) {
 	var buf bytes.Buffer
 
-	for i := 0; i < K; i++ {
+	for i := 1; i < N; i++ {
 		chunk, exists := chunks[i]
 		if !exists {
 			return "", fmt.Errorf("missing chunk %d", i)

@@ -12,13 +12,13 @@ import (
 // K = N - f | f = 10% of N
 const (
 	TXN_SIZE         = 1_000_000
-	N                = 100      // size of each coded chunk is TXN_SIZE/K !!!
+	N                = 50       // size of each coded chunk is TXN_SIZE/K !!!
 	BUFFER_SIZE      = 65536    // 2^16
 	BANDWIDTH        = 12500000 // 10 Megabit per sec = 1.25 * 10^6 bytes per second
 	UPLOAD_BANDWIDTH = 1250000
 	// 8765437
 	NETWORK_DELAY = 300 * time.Millisecond
-	COUNTER       = 7 // Bandwdith / (F/N) -- F is the size of the file in bytes
+	COUNTER       = 3 // Bandwdith / (F/N) -- F is the size of the file in bytes
 )
 
 var F = make(map[int]bool)
@@ -109,6 +109,7 @@ func main() {
 	fmt.Printf("Size of each coded chunk: %d bytes\n", SizeOfTheFile()/N)
 	// Maximum number of coded chunk respected to the bandwidth
 	fmt.Printf("Maximum number of coded chunks: %d\n", BANDWIDTH/(SizeOfTheFile()/N))
+	// time.Sleep(10 * time.Second)
 	faultyNodes := []int{}
 	InitializeAdversary(faultyNodes)
 

@@ -143,7 +143,7 @@ func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 		// Upload bandwidth limitation:
 		bandwidthLimit := len(responseBytes) / UPLOAD_BANDWIDTH
 		fmt.Println("Bandwidth limit: ", bandwidthLimit)
-		// time.Sleep(time.Duration(bandwidthLimit) * time.Second)
+		time.Sleep(time.Duration(bandwidthLimit) * time.Second)
 		_, err = conn.Write(responseBytes)
 		if err != nil {
 			log.Printf("Error writing response to connection: %v", err)

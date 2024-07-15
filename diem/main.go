@@ -1,15 +1,20 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"time"
+
+	"golang.org/x/exp/rand"
 )
 
 const (
-	TXN_SIZE      = 1_000_000
-	CHUNK_SIZE    = 7936
-	BUFFER_SIZE   = 65536
-	NETWORK_DELAY = 0 * time.Millisecond
+	TXN_SIZE           = 1_000_000
+	CHUNK_SIZE         = 7936
+	N                  = 30
+	faultyNodesCounter = 10
+	BUFFER_SIZE        = 65536
+	NETWORK_DELAY      = 300 * time.Millisecond
 )
 
 var F = make(map[int]bool)
@@ -94,11 +99,22 @@ type TransactionInfo struct {
 	TransactionHash string // Hash of the transaction
 }
 
-func main() {
+// Generate faulty nodes - output an array of faulty nodes which are randomly selected
+func faultyNodesDriver(count int) []int {
 	faultyNodes := []int{}
+	for i := 0; i < count; i++ {
+		// a random number between 0 and N named randomNode
+		randomNode := rand.Intn(N)
+		faultyNodes = append(faultyNodes, randomNode)
+	}
+	return faultyNodes
+}
+func main() {
+	faultyNodes := faultyNodesDriver(faultyNodesCounter)
+	fmt.Println("Faulty nodes:", faultyNodes)
 	InitializeAdversary(faultyNodes)
 
-	network := InitializeNetwork(10, 8000)
+	network := InitializeNetwork(N, 8000)
 	for _, node := range network.Nodes {
 		go node.Start()
 	}

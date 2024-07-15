@@ -19,7 +19,7 @@ func InitializeNetwork(numNodes int, startingPort int) *Network {
 	network := &Network{
 		Nodes: make(map[int]*Node),
 	}
-	for i := 0; i < N; i++ {
+	for i := 0; i < Nodes; i++ {
 		address := fmt.Sprintf("localhost:%d", startingPort+i)
 		listener, err := net.Listen("tcp", address)
 		byzantine := false

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"time"
 
@@ -12,16 +13,18 @@ import (
 // K = N - f | f = 10% of N
 const (
 	TXN_SIZE         = 1_000_000
-	N                = 30       // size of each coded chunk is TXN_SIZE/K !!!
-	K                = 27       // How can we choose K?
+	N                = 50 // size of each coded chunk is TXN_SIZE/K !!!
+	Nodes            = N
+	K                = 44 // N-f-1
+	faultyNodesCount = 5
 	BUFFER_SIZE      = 65536    // 2^16
 	BANDWIDTH        = 12500000 // 10 Megabit per sec = 1.25 * 10^6 bytes per second
 	UPLOAD_BANDWIDTH = 1250000
 	// 8765437
 	NETWORK_DELAY = 300 * time.Millisecond
-	COUNTER       = 2 // Bandwdith / (F/K) -- F is the size of the file in bytes
 )
 
+var COUNTER = 0
 var F = make(map[int]bool)
 
 type Transaction struct {
@@ -97,6 +100,17 @@ type SyncMetrics struct {
 	VerificationTime  time.Duration // Time taken to verify all chunks
 }
 
+// Generate faulty nodes - output an array of faulty nodes which are randomly selected
+func faultyNodesDriver(count int) []int {
+	faultyNodes := []int{}
+	for i := 0; i < count; i++ {
+		// a random number between 0 and N named randomNode
+		randomNode := rand.Intn(N)
+		faultyNodes = append(faultyNodes, randomNode)
+	}
+	return faultyNodes
+}
+
 func main() {
 	// Size of a single transaction in bytes]
 	fmt.Printf("Size of a single transaction: %d bytes\n", SizeOfOneTransaction())
@@ -108,11 +122,14 @@ func main() {
 	fmt.Printf("Size of each coded chunk: %d bytes\n", SizeOfTheFile()/K)
 	// Maximum number of coded chunk respected to the bandwidth
 	fmt.Printf("Maximum number of coded chunks: %d\n", BANDWIDTH/(SizeOfTheFile()/K))
-
-	faultyNodes := []int{}
+	COUNTER = BANDWIDTH / (SizeOfTheFile() / K)
+	fmt.Println("COUNTER:", COUNTER)
+	faultyNodes := faultyNodesDriver(faultyNodesCount)
+	// print the faulty nodes
+	fmt.Println("Faulty nodes:", faultyNodes)
 	InitializeAdversary(faultyNodes)
 
-	network := InitializeNetwork(N, 8000)
+	network := InitializeNetwork(Nodes, 8000)
 	for _, node := range network.Nodes {
 		go node.Start()
 	}

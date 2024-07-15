@@ -58,6 +58,7 @@ func (n *Node) sendChunkRequest(blockID int) {
 	for {
 		// selectedPeer := n.Peers[rand.Intn(len(n.Peers))]
 		indexPeer := n.selectRandomPeer()
+		fmt.Println("Chosen peer: ", indexPeer)
 		selectedPeer := n.Peers[indexPeer]
 		conn, err := net.Dial("tcp", selectedPeer)
 		if err != nil {
@@ -91,6 +92,7 @@ func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 	txs := block.Transactions
 	fmt.Println("num of txs: ", len(txs))
 	if n.IsByzantine {
+		fmt.Println("I am a byzantine node")
 		// DOING NOTHING
 	} else {
 		for i := 0; i < len(block.Transactions); i += request.RequestSize {

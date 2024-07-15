@@ -36,7 +36,7 @@ func (n *Node) sendChunkRequest(blockID int) {
 	}
 	wg := sync.WaitGroup{}
 
-	for i := 1; i < N; i++ {
+	for i := 1; i < Nodes; i++ {
 		wg.Add(1)
 		if (i%COUNTER == 0) && (i != 0) {
 			time.Sleep(1 * time.Second)

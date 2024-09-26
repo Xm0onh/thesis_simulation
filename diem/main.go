@@ -10,7 +10,7 @@ import (
 
 const (
 	TXN_SIZE           = 1_000_000
-	CHUNK_SIZE         = 7936
+	CHUNK_SIZE         = 7936 // 1000000/(157777866/1250000)
 	N                  = 30
 	faultyNodesCounter = 10
 	BUFFER_SIZE        = 65536

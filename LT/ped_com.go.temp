@@ -1,0 +1,445 @@
+package main
+
+import (
+	crand "crypto/rand"
+	"fmt"
+	"math"
+	"math/big"
+	mrand "math/rand"
+	"sort"
+	"time"
+)
+
+// ------------------------
+// Robust Soliton Distribution
+// ------------------------
+
+type RobustSolitonParams struct {
+	K     int     // Number of input symbols
+	c     float64 // Failure probability parameter
+	delta float64 // Failure probability parameter
+}
+
+// Generate the ideal soliton distribution
+func IdealSolitonDistribution(K int) []float64 {
+	rho := make([]float64, K+1)
+	rho[1] = 1.0 / float64(K)
+	for d := 2; d <= K; d++ {
+		rho[d] = 1.0 / (float64(d) * float64(d-1))
+	}
+	return rho
+}
+
+// Generate the robust soliton distribution
+func RobustSolitonDistribution(params RobustSolitonParams) []float64 {
+	K := params.K
+	c := params.c
+	delta := params.delta
+
+	rho := IdealSolitonDistribution(K)
+
+	R := c * math.Log(float64(K)/delta) * math.Sqrt(float64(K))
+	tau := make([]float64, K+1)
+	for d := 1; d <= K; d++ {
+		if d < int(math.Floor(float64(K)/R)) {
+			tau[d] = R / (float64(d) * float64(K))
+		} else if d == int(math.Floor(float64(K)/R)) {
+			tau[d] = R * math.Log(R/delta) / float64(K)
+		} else {
+			tau[d] = 0
+		}
+	}
+
+	Z := 0.0
+	for d := 1; d <= K; d++ {
+		Z += rho[d] + tau[d]
+	}
+
+	robust := make([]float64, K+1)
+	for d := 1; d <= K; d++ {
+		robust[d] = (rho[d] + tau[d]) / Z
+	}
+	return robust
+}
+
+// Select a degree d according to the robust soliton distribution
+func SampleDegree(robust []float64) int {
+	cumulative := make([]float64, len(robust))
+	cumulative[0] = 0.0
+	for i := 1; i < len(robust); i++ {
+		cumulative[i] = cumulative[i-1] + robust[i]
+	}
+	r := randFloat()
+	for i := 1; i < len(cumulative); i++ {
+		if r < cumulative[i] {
+			return i
+		}
+	}
+	return len(robust) - 1
+}
+
+// ------------------------
+// Encoding and Decoding
+// ------------------------
+
+// EncodedSymbol represents an encoded symbol with its associated positions
+type EncodedSymbol struct {
+	Value     *big.Int
+	Positions []int
+}
+
+// Encoding function over Zp
+func Encode(message []*big.Int, numEncodedSymbols int, p *big.Int, robust []float64) []EncodedSymbol {
+	K := len(message)
+	encodedSymbols := make([]EncodedSymbol, numEncodedSymbols)
+	for i := 0; i < numEncodedSymbols; i++ {
+		d := SampleDegree(robust)
+		positions := randPerm(K, d)
+		symbol := big.NewInt(0)
+		for _, pos := range positions {
+			symbol.Add(symbol, message[pos])
+			symbol.Mod(symbol, p)
+		}
+		encodedSymbols[i] = EncodedSymbol{
+			Value:     new(big.Int).Set(symbol),
+			Positions: positions,
+		}
+	}
+	return encodedSymbols
+}
+
+// Peeling decoding over Zp
+func Decode(encodedSymbols []EncodedSymbol, K int, p *big.Int) ([]*big.Int, bool) {
+	// Initialize the set of unrecovered positions
+	unrecovered := make(map[int]bool)
+	for i := 0; i < K; i++ {
+		unrecovered[i] = true
+	}
+
+	// Make a copy of encodedSymbols to modify during decoding
+	esCopy := make([]EncodedSymbol, len(encodedSymbols))
+	copy(esCopy, encodedSymbols)
+
+	// Initialize queue with encoded symbols of degree one
+	queue := []int{}
+	for i, es := range esCopy {
+		if len(es.Positions) == 1 {
+			queue = append(queue, i)
+		}
+	}
+
+	recovered := make([]*big.Int, K)
+
+	for len(queue) > 0 {
+		esIndex := queue[0]
+		queue = queue[1:]
+		es := esCopy[esIndex]
+
+		// Check if Positions is not empty
+		if len(es.Positions) == 0 {
+			continue
+		}
+
+		pos := es.Positions[0]
+
+		if !unrecovered[pos] {
+			continue
+		}
+
+		value := es.Value
+		recovered[pos] = new(big.Int).Set(value)
+		unrecovered[pos] = false
+
+		// Update other encoded symbols
+		for i, otherEs := range esCopy {
+			if i == esIndex {
+				continue
+			}
+			if contains(otherEs.Positions, pos) {
+				// Subtract the recovered value
+				otherEs.Value.Sub(otherEs.Value, value)
+				otherEs.Value.Mod(otherEs.Value, p)
+				// Remove the position from Positions
+				esCopy[i].Positions = removePosition(otherEs.Positions, pos)
+				if len(esCopy[i].Positions) == 1 {
+					queue = append(queue, i)
+				}
+			}
+		}
+	}
+
+	success := true
+	for _, unrecovered := range unrecovered {
+		if unrecovered {
+			success = false
+			break
+		}
+	}
+
+	if success {
+		return recovered, true
+	} else {
+		return nil, false
+	}
+}
+
+// Helper functions
+func contains(positions []int, pos int) bool {
+	for _, p := range positions {
+		if p == pos {
+			return true
+		}
+	}
+	return false
+}
+
+func removePosition(positions []int, pos int) []int {
+	index := -1
+	for i, p := range positions {
+		if p == pos {
+			index = i
+			break
+		}
+	}
+	if index != -1 {
+		positions = append(positions[:index], positions[index+1:]...)
+	}
+	return positions
+}
+
+// ------------------------
+// Homomorphic Commitments
+// ------------------------
+
+type PedersenParams struct {
+	P *big.Int // Large prime number
+	Q *big.Int // Order of the group
+	G *big.Int // Generator g
+	H *big.Int // Generator h
+}
+
+// Generate Pedersen Parameters
+func GeneratePedersenParams(bitSize int) (*PedersenParams, error) {
+	var P, Q *big.Int
+	var err error
+
+	for {
+		// Generate a prime Q of bitSize - 1 bits
+		Q, err = crand.Prime(crand.Reader, bitSize-1)
+		if err != nil {
+			return nil, err
+		}
+
+		// Compute P = 2Q + 1
+		P = new(big.Int).Mul(Q, big.NewInt(2))
+		P = P.Add(P, big.NewInt(1))
+
+		// Check if P is prime
+		if P.ProbablyPrime(20) {
+			break // P is a safe prime
+		}
+		// Else, continue the loop to try again
+	}
+
+	// Choose generators G and H
+	G, err := findGenerator(P, Q)
+	if err != nil {
+		return nil, err
+	}
+	H, err := findGenerator(P, Q)
+	if err != nil {
+		return nil, err
+	}
+	if G.Cmp(H) == 0 {
+		// Ensure G and H are different
+		H, err = findGenerator(P, Q)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &PedersenParams{P: P, Q: Q, G: G, H: H}, nil
+}
+
+func findGenerator(P, Q *big.Int) (*big.Int, error) {
+	one := big.NewInt(1)
+	PMinusOne := new(big.Int).Sub(P, one)
+	two := big.NewInt(2)
+	exponent := new(big.Int).Div(PMinusOne, Q) // exponent = 2
+
+	for {
+		h, err := crand.Int(crand.Reader, new(big.Int).Sub(P, two))
+		if err != nil {
+			return nil, err
+		}
+		h.Add(h, two) // Ensure 2 <= h < P
+
+		g := new(big.Int).Exp(h, exponent, P) // g = h^2 mod P
+
+		if g.Cmp(one) == 0 || g.Cmp(PMinusOne) == 0 {
+			continue // g should not be 1 or -1 mod P
+		}
+
+		// Check that g^Q mod P == 1
+		gToQ := new(big.Int).Exp(g, Q, P)
+		if gToQ.Cmp(one) != 0 {
+			continue // Try another h
+		}
+
+		return g, nil
+	}
+}
+
+func PedersenCommit(params *PedersenParams, m, r *big.Int) *big.Int {
+	mModQ := new(big.Int).Mod(m, params.Q)
+	rModQ := new(big.Int).Mod(r, params.Q)
+	gm := new(big.Int).Exp(params.G, mModQ, params.P)
+	hr := new(big.Int).Exp(params.H, rModQ, params.P)
+	commitment := new(big.Int).Mul(gm, hr)
+	commitment.Mod(commitment, params.P)
+	return commitment
+}
+
+// ------------------------
+// Random Utilities
+// ------------------------
+
+func randInt(max *big.Int) *big.Int {
+	n, err := crand.Int(crand.Reader, max)
+	if err != nil {
+		panic(err)
+	}
+	return n
+}
+
+func randFloat() float64 {
+	n, err := crand.Int(crand.Reader, new(big.Int).Lsh(big.NewInt(1), 53))
+	if err != nil {
+		panic(err)
+	}
+	return float64(n.Int64()) / (1 << 53)
+}
+
+func randPerm(n, k int) []int {
+	perm := mrand.Perm(n)
+	return perm[:k]
+}
+
+// ------------------------
+// Main Function
+// ------------------------
+
+func main() {
+	mrand.Seed(time.Now().UnixNano())
+
+	// Generate Pedersen Parameters
+	fmt.Println("Generating Pedersen parameters...")
+	pedersenParams, err := GeneratePedersenParams(256)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Pedersen parameters generated.")
+
+	// Parameters
+	p := pedersenParams.Q   // Set p = Q
+	K := 10                 // Number of input symbols
+	numEncodedSymbols := 25 // Number of encoded symbols
+
+	// Message symbols (random integers in Zp)
+	message := make([]*big.Int, K)
+	for i := 0; i < K; i++ {
+		message[i] = randInt(p)
+	}
+	fmt.Println("Original message:")
+	for i := 0; i < K; i++ {
+		fmt.Printf("Message %d: %s\n", i, message[i].String())
+	}
+
+	// Compute commitments over the data chunks directly (without hashing)
+	dataCommitments := make([]*big.Int, K)
+	dataRandomness := make([]*big.Int, K)
+	for i := 0; i < K; i++ {
+		mInt := message[i]
+		r := randInt(p)
+		commitment := PedersenCommit(pedersenParams, mInt, r)
+		dataCommitments[i] = commitment
+		dataRandomness[i] = r
+	}
+
+	// Print data commitments
+	fmt.Println("Data Commitments:")
+	for i, c := range dataCommitments {
+		fmt.Printf("Commitment %d: %s\n", i, c.String())
+	}
+
+	// Robust Soliton Distribution
+	params := RobustSolitonParams{
+		K:     K,
+		c:     0.1,
+		delta: 0.5,
+	}
+	robust := RobustSolitonDistribution(params)
+
+	// Encoding
+	encodedSymbols := Encode(message, numEncodedSymbols, p, robust)
+	fmt.Println("Encoded Symbols:")
+	for _, es := range encodedSymbols {
+		sort.Ints(es.Positions)
+		fmt.Printf("Value: %s, Positions: %v\n", es.Value.String(), es.Positions)
+	}
+
+	// Compute commitments over the coded chunks using homomorphic property
+	for idx, es := range encodedSymbols {
+		// Compute combined commitment
+		codedCommitment := big.NewInt(1)
+		for _, pos := range es.Positions {
+			codedCommitment.Mul(codedCommitment, dataCommitments[pos])
+			codedCommitment.Mod(codedCommitment, pedersenParams.P)
+		}
+
+		// Sum the randomness values
+		rSum := big.NewInt(0)
+		for _, pos := range es.Positions {
+			rSum.Add(rSum, dataRandomness[pos])
+		}
+		rSum.Mod(rSum, pedersenParams.Q)
+
+		// Compute commitment over the coded chunk directly
+		codedChunkValue := es.Value
+		computedCodedCommitment := PedersenCommit(pedersenParams, codedChunkValue, rSum)
+
+		// Verify that the commitments match
+		if codedCommitment.Cmp(computedCodedCommitment) == 0 {
+			fmt.Printf("Encoded Symbol %d: Commitment verification successful.\n", idx)
+		} else {
+			fmt.Printf("Encoded Symbol %d: Commitment verification failed.\n", idx)
+		}
+	}
+
+	// Decoding
+	recoveredMessage, success := Decode(encodedSymbols, K, p)
+	if success {
+		fmt.Println("Recovered message:")
+		for i := 0; i < K; i++ {
+			fmt.Printf("Message %d: %s\n", i, recoveredMessage[i].String())
+		}
+	} else {
+		fmt.Println("Decoding failed. Not enough symbols or insufficient degrees.")
+	}
+
+	// Verify recovered message commitments
+	if success {
+		allVerified := true
+		for i := 0; i < K; i++ {
+			mInt := recoveredMessage[i]
+			commitment := PedersenCommit(pedersenParams, mInt, dataRandomness[i])
+			if commitment.Cmp(dataCommitments[i]) != 0 {
+				fmt.Printf("Commitment verification failed for message symbol %d.\n", i)
+				allVerified = false
+			}
+		}
+		if allVerified {
+			fmt.Println("All message commitments verified successfully.")
+		}
+	}
+}

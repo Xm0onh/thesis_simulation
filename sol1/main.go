@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"net"
@@ -13,19 +14,20 @@ import (
 // K = N - f | f = 10% of N
 const (
 	TXN_SIZE         = 1_000_000
-	N                = 50 // size of each coded chunk is TXN_SIZE/K !!!
-	Nodes            = N
-	K                = 44 // N-f-1
-	faultyNodesCount = 5
 	BUFFER_SIZE      = 65536    // 2^16
 	BANDWIDTH        = 12500000 // 10 Megabit per sec = 1.25 * 10^6 bytes per second
 	UPLOAD_BANDWIDTH = 1250000
-	// 8765437
-	NETWORK_DELAY = 300 * time.Millisecond
+	NETWORK_DELAY    = 300 * time.Millisecond
 )
 
-var COUNTER = 0
-var F = make(map[int]bool)
+var (
+	N                int // Number of nodes (to be set through flag)
+	K                int // Number of honest nodes (to be set through flag)
+	faultyNodesCount int
+	COUNTER          int
+	F                = make(map[int]bool)
+	Nodes            int
+)
 
 type Transaction struct {
 	ID        string // Unique identifier for the transaction
@@ -44,19 +46,19 @@ type Block struct {
 }
 
 type Node struct {
-	ID             int            // Unique identifier for the node
-	Address        string         // TCP address for the node
-	Listener       net.Listener   // Listener for incoming connections
-	Blockchain     []*Block       // Dynamic array of blocks representing the node's current blockchain
-	Network        *Network       // Reference to the network for communications
-	IsByzantine    bool           // Indicates whether the node exhibits Byzantine behavior
-	Peers          map[int]string // Map of peer nodes for direct referencing and messaging
-	BlockHeight    int            // Current height of the blockchain this node maintains
-	ConsensusRole  string         // Role of the node in the consensus process, e.g., proposer, validator
-	Metrics        *SyncMetrics   // Metrics for tracking synchronization performance
-	BlackList      map[int]bool   // List of nodes to ignore during synchronization
-	ReceivedChunks map[int]Chunk  // Map of received chunks indexed by their block ID
-
+	ID                int            // Unique identifier for the node
+	Address           string         // TCP address for the node
+	Listener          net.Listener   // Listener for incoming connections
+	Blockchain        []*Block       // Dynamic array of blocks representing the node's current blockchain
+	Network           *Network       // Reference to the network for communications
+	IsByzantine       bool           // Indicates whether the node exhibits Byzantine behavior
+	Peers             map[int]string // Map of peer nodes for direct referencing and messaging
+	BlockHeight       int            // Current height of the blockchain this node maintains
+	ConsensusRole     string         // Role of the node in the consensus process, e.g., proposer, validator
+	Metrics           *SyncMetrics   // Metrics for tracking synchronization performance
+	BlackList         map[int]bool   // List of nodes to ignore during synchronization
+	ReceivedChunks    map[int]Chunk  // Map of received chunks indexed by their block ID
+	BandwidthOverhead int
 }
 
 type Network struct {
@@ -112,6 +114,13 @@ func faultyNodesDriver(count int) []int {
 }
 
 func main() {
+	flag.IntVar(&N, "N", 50, "Number of nodes")
+	flag.IntVar(&faultyNodesCount, "f", 15, "Number of faulty nodes")
+	flag.Parse()
+	fmt.Println("F:", faultyNodesCount)
+	K = N - faultyNodesCount
+	N++
+	Nodes = N
 	// Size of a single transaction in bytes]
 	fmt.Printf("Size of a single transaction: %d bytes\n", SizeOfOneTransaction())
 	// Size of the entire file in bytes

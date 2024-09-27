@@ -32,14 +32,15 @@ func InitializeNetwork(numNodes int, startingPort int) *Network {
 			byzantine = true
 		}
 		node := &Node{
-			ID:             i,
-			Address:        address,
-			Listener:       listener,
-			Peers:          make(map[int]string),
-			Blockchain:     make([]*Block, 0),
-			IsByzantine:    byzantine,
-			BlackList:      make(map[int]bool),
-			ReceivedChunks: make(map[int]Chunk),
+			ID:                i,
+			Address:           address,
+			Listener:          listener,
+			Peers:             make(map[int]string),
+			Blockchain:        make([]*Block, 0),
+			IsByzantine:       byzantine,
+			BlackList:         make(map[int]bool),
+			ReceivedChunks:    make(map[int]Chunk),
+			BandwidthOverhead: 0,
 		}
 		network.Nodes[i] = node
 	}

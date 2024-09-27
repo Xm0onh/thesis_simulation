@@ -88,7 +88,7 @@ func (n *Node) sendChunkRequest(blockID int) {
 func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 	block := n.generateBlockForRequest(request.BlockID)
 	blockBytes, _ := json.Marshal(block)
-	fmt.Println("Size of block in bytes: ", len(blockBytes))
+	// fmt.Println("Size of block in bytes: ", len(blockBytes))
 	chunks := GenerateCodedChunks(blockBytes)
 	rootHash, proofs := CreateVectorCommitment(chunks)
 	if n.IsByzantine {
@@ -120,6 +120,9 @@ func (n *Node) processChunkRequest(request *ChunkRequest, conn net.Conn) {
 		time.Sleep(NETWORK_DELAY)
 		// Upload bandwidth limitation:
 		bandwidthLimit := len(responseBytes) / UPLOAD_BANDWIDTH
+		if n.BandwidthOverhead == 0 {
+			n.BandwidthOverhead += bandwidthLimit
+		}
 		fmt.Println("Bandwidth limit: ", bandwidthLimit)
 		// time.Sleep(time.Duration(bandwidthLimit) * time.Second)
 		_, err = conn.Write(responseBytes)
@@ -171,6 +174,7 @@ func (n *Node) handleChunkResponse(response *ChunkResponse) {
 		fmt.Println("Decoded message:", len(decodedMessage))
 		n.Metrics.EndTime = time.Now()
 		n.Metrics.TotalDuration = n.Metrics.EndTime.Sub(n.Metrics.StartTime)
+		// n.Metrics.TotalDuration += time.Duration(n.BandwidthOverhead) * time.Second
 		fmt.Printf("Sync Metrics for Node %d: %+v\n", n.ID, n.Metrics)
 		panic("Sync complete")
 		// size of message in byte

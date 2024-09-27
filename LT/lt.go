@@ -8,7 +8,6 @@ import (
 	"math/big"
 	mrand "math/rand"
 	"os"
-	"sort"
 	"time"
 )
 
@@ -242,7 +241,8 @@ func GeneratePedersenParams(bitSize int) (*PedersenParams, error) {
 		}
 		// Else, continue the loop to try again
 	}
-
+	fmt.Println("P:", P.String())
+	fmt.Println("Q:", Q.String())
 	// Choose generators G and H
 	G, err := findGenerator(P, Q)
 	if err != nil {
@@ -389,10 +389,10 @@ func main() {
 		message[i].Mod(message[i], p)
 	}
 
-	fmt.Println("Original message:")
-	for i := 0; i < K; i++ {
-		fmt.Printf("Message %d: %s\n", i, message[i].String())
-	}
+	// fmt.Println("Original message:")
+	// for i := 0; i < K; i++ {
+	// 	fmt.Printf("Message %d: %s\n", i, message[i].String())
+	// }
 
 	// Compute commitments over the data chunks directly (without hashing)
 	dataCommitments := make([]*big.Int, K)
@@ -406,10 +406,10 @@ func main() {
 	}
 
 	// Print data commitments
-	fmt.Println("Data Commitments:")
-	for i, c := range dataCommitments {
-		fmt.Printf("Commitment %d: %s\n", i, c.String())
-	}
+	// fmt.Println("Data Commitments:")
+	// for i, c := range dataCommitments {
+	// 	fmt.Printf("Commitment %d: %s\n", i, c.String())
+	// }
 
 	// Robust Soliton Distribution
 	params := RobustSolitonParams{
@@ -420,15 +420,16 @@ func main() {
 	robust := RobustSolitonDistribution(params)
 
 	// Encoding
-	numEncodedSymbols := 25 // Number of encoded symbols
+	numEncodedSymbols := 1200 // Number of encoded symbols
 	encodedSymbols := Encode(message, numEncodedSymbols, p, robust)
-	fmt.Println("Encoded Symbols:")
-	for _, es := range encodedSymbols {
-		sort.Ints(es.Positions)
-		fmt.Printf("Value: %s, Positions: %v\n", es.Value.String(), es.Positions)
-	}
+	// fmt.Println("Encoded Symbols:")
+	// for _, es := range encodedSymbols {
+	// 	sort.Ints(es.Positions)
+	// 	fmt.Printf("Value: %s, Positions: %v\n", es.Value.String(), es.Positions)
+	// }
 
 	// Compute commitments over the coded chunks using homomorphic property
+	startTime := time.Now()
 	for idx, es := range encodedSymbols {
 		// Compute combined commitment
 		codedCommitment := big.NewInt(1)
@@ -450,24 +451,29 @@ func main() {
 
 		// Verify that the commitments match
 		if codedCommitment.Cmp(computedCodedCommitment) == 0 {
-			fmt.Printf("Encoded Symbol %d: Commitment verification successful.\n", idx)
+			// fmt.Printf("Encoded Symbol %d: Commitment verification successful.\n", idx)
 		} else {
 			fmt.Printf("Encoded Symbol %d: Commitment verification failed.\n", idx)
 		}
 	}
+	fmt.Printf("Time taken For Computing Commitments: %f milliseconds\n", time.Since(startTime).Seconds()*1000)
 
 	// Decoding
+	startTime = time.Now()
 	recoveredMessage, success := Decode(encodedSymbols, K, p)
 	if success {
-		fmt.Println("Recovered message:")
-		for i := 0; i < K; i++ {
-			fmt.Printf("Message %d: %s\n", i, recoveredMessage[i].String())
-		}
+		// fmt.Println("Recovered message:")
+		// for i := 0; i < K; i++ {
+		// 	fmt.Printf("Message %d: %s\n", i, recoveredMessage[i].String())
+		// }
+		// Print the duration in milliseconds
+		fmt.Printf("Time taken For Decoding: %f milliseconds\n", time.Since(startTime).Seconds()*1000)
 	} else {
 		fmt.Println("Decoding failed. Not enough symbols or insufficient degrees.")
 	}
 
 	// Verify recovered message commitments
+	startTime = time.Now()
 	if success {
 		allVerified := true
 		for i := 0; i < K; i++ {
@@ -480,6 +486,7 @@ func main() {
 		}
 		if allVerified {
 			fmt.Println("All message commitments verified successfully.")
+			fmt.Printf("Time taken For Verifying Commitments: %f milliseconds\n", time.Since(startTime).Seconds()*1000)
 		}
 	}
 }
